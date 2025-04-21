@@ -26,10 +26,10 @@
 
 ### 配置文件
 
-- `requirements_full.txt` - 完整的依赖列表
+- `requirements.txt` - 项目依赖列表
 - `setup.sh` - Linux/macOS安装脚本
 - `setup.bat` - Windows安装脚本
-- `README_new.md` - 新版本的说明文档
+- `USAGE.md` - 详细使用说明文档
 
 ## 工具脚本（推荐保留）
 
@@ -37,8 +37,8 @@
 
 - `run_crawlers.py` - 批量运行爬虫
 - `cleanup.py` - 清理临时文件和缓存
-- `test_steam.py` - Steam爬虫测试脚本
-- `test_crawler.py` - 通用爬虫测试脚本
+- `run_on_mac.sh` - Mac系统运行脚本
+- `run_on_windows.bat` - Windows系统运行脚本
 
 ## 自动创建的目录
 
@@ -59,8 +59,8 @@
 - `__pycache__/` - Python缓存目录
 - `Tapcomment.py` - 旧版爬虫文件（已被tap_crawler.py替代）
 - `Bilicomment.py` - 旧版爬虫文件（已被bili_crawler.py替代）
-- `requirements.txt` - 旧版依赖文件（已被requirements_full.txt替代）
-- `requirements_web.txt` - 旧版Web依赖文件（已被requirements_full.txt替代）
+- `requirements_web.txt` - 旧版Web依赖文件（已被requirements.txt替代）
+- `test_env/` - 测试用虚拟环境目录
 
 ## 数据文件
 

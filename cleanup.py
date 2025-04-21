@@ -54,18 +54,19 @@ FILES_TO_KEEP = [
     "tap_crawler.py",
     "bili_crawler.py",
     "crawler_base.py",
-    "test_steam.py",
-    "test_crawler.py",
     "requirements.txt",
-    "requirements_clean.txt",
     "run_crawlers.py",
     "main.py",
-    "Tapcomment.py",
-    "Bilicomment.py",
     "README.md",
     "LICENSE",
     ".gitignore",
-    "cleanup.py"
+    "cleanup.py",
+    "USAGE.md",
+    "setup.sh",
+    "setup.bat",
+    "crawler_web_start.py",
+    "run_on_mac.sh",
+    "run_on_windows.bat"
 ]
 
 def is_file_to_delete(filename):

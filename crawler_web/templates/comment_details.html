@@ -58,6 +58,7 @@
         .btn-back {
             display: inline-block;
             margin-top: 20px;
+            margin-right: 10px;
             padding: 8px 15px;
             background-color: #0066cc;
             color: white;
@@ -66,6 +67,19 @@
         }
         .btn-back:hover {
             background-color: #0052a3;
+        }
+        .btn-folder {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 8px 15px;
+            background-color: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .btn-folder:hover {
+            background-color: #218838;
         }
         .stats {
             margin: 20px 0;
@@ -103,6 +117,9 @@
             background-color: #ffeeee;
             border-radius: 5px;
             text-align: center;
+        }
+        .button-group {
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -162,7 +179,26 @@
         
         {% endif %}
         
-        <a href="{{ url_for('list_comments') }}" class="btn-back">返回评论列表</a>
+        <div class="button-group">
+            <a href="{{ url_for('list_comments') }}" class="btn-back">返回评论列表</a>
+            <a id="open-folder-btn" class="btn-folder">打开输出文件夹</a>
+        </div>
     </div>
+    
+    <script>
+        document.getElementById('open-folder-btn').addEventListener('click', function() {
+            fetch('/open_output_folder')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('打开文件夹出错:', error);
+                    alert('打开文件夹失败，请手动打开output目录');
+                });
+        });
+    </script>
 </body>
 </html> 

@@ -8,6 +8,7 @@
 import os
 import sys
 import csv  # CSV模块用于读取CSV文件
+import subprocess  # 用于打开文件夹
 
 # 添加项目根目录到系统路径，确保能够导入自定义模块
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -168,119 +169,163 @@ def view_comment_file(file_path):
                               filename=os.path.basename(full_path),
                               error="读取文件出错: {}".format(str(e)))
 
+@app.route('/open_output_folder')
+def open_output_folder():
+    """打开output文件夹"""
+    try:
+        output_path = os.path.abspath('output')
+        
+        # 检测操作系统并使用适当的命令打开文件夹
+        if sys.platform.startswith('darwin'):  # macOS
+            subprocess.Popen(['open', output_path])
+        elif sys.platform.startswith('win'):   # Windows
+            subprocess.Popen(['explorer', output_path])
+        else:  # Linux
+            subprocess.Popen(['xdg-open', output_path])
+            
+        return jsonify({"success": True, "message": "已打开输出文件夹"})
+    except Exception as e:
+        return jsonify({"success": False, "message": f"打开文件夹失败: {str(e)}"})
+
 def run_crawler(crawler_type, url=''):
     """运行爬虫的线程函数"""
     global crawler_status
     
     # 更新初始状态
     crawler_status["log"].append("正在准备{}爬虫...".format(crawler_type))
+    crawler_status["log"].append("服务器状态：初始化爬虫环境")
     crawler_status["progress"] = 5
     
     try:
         if crawler_type == "steam":
             # 导入并运行Steam爬虫
             crawler_status["log"].append("正在导入Steam爬虫模块...")
+            crawler_status["log"].append("服务器状态：加载Steam爬虫依赖")
             crawler_status["progress"] = 10
             from steam_crawler import SteamCrawler
             
             # 初始化爬虫
             crawler_status["log"].append("正在初始化爬虫...")
+            crawler_status["log"].append("服务器状态：创建Chrome浏览器实例")
             crawler_status["progress"] = 15
             crawler = SteamCrawler(use_headless=True)
             
             # 更新日志
             crawler_status["log"].append("Steam爬虫已启动")
+            crawler_status["log"].append("服务器状态：爬虫初始化完成")
             crawler_status["progress"] = 20
             
             if url:
                 crawler_status["log"].append("正在爬取Steam评论: {}".format(url))
+                crawler_status["log"].append("服务器状态：正在访问目标网页")
                 crawler_status["progress"] = 25
                 try:
                     crawler_status["log"].append("开始提取评论数据...")
+                    crawler_status["log"].append("服务器状态：页面解析中，正在提取评论数据")
                     crawler_status["progress"] = 30
                     crawler.extract_comments(url)
-                    crawler_status["progress"] = 90
-                    crawler_status["log"].append('评论爬取完成！可以在"查看评论"页面查看结果')
+                    crawler_status["log"].append("数据提取完成")
+                    crawler_status["log"].append("服务器状态：评论数据已保存到output目录")
+                    crawler_status["progress"] = 100
                 except Exception as e:
-                    crawler_status["log"].append("爬取过程中出错: {}".format(str(e)))
+                    crawler_status["log"].append("提取数据时出错: {}".format(str(e)))
+                    crawler_status["log"].append("服务器状态：爬虫遇到错误，请检查URL是否有效")
             else:
-                crawler_status["log"].append("未提供URL，请在输入框中填写Steam游戏评论URL")
-                
+                crawler_status["log"].append("未提供有效的Steam URL")
+                crawler_status["log"].append("服务器状态：需要有效的游戏URL才能继续")
+        
         elif crawler_type == "taptap":
             # 导入并运行TapTap爬虫
             crawler_status["log"].append("正在导入TapTap爬虫模块...")
+            crawler_status["log"].append("服务器状态：加载TapTap爬虫依赖")
             crawler_status["progress"] = 10
-            from tap_crawler import TapTapCrawler
+            from tap_crawler import TapCrawler
             
             # 初始化爬虫
             crawler_status["log"].append("正在初始化爬虫...")
+            crawler_status["log"].append("服务器状态：创建Chrome浏览器实例")
             crawler_status["progress"] = 15
-            crawler = TapTapCrawler(use_headless=True)
+            crawler = TapCrawler(use_headless=True)
             
             # 更新日志
             crawler_status["log"].append("TapTap爬虫已启动")
+            crawler_status["log"].append("服务器状态：爬虫初始化完成")
             crawler_status["progress"] = 20
             
             if url:
                 crawler_status["log"].append("正在爬取TapTap评论: {}".format(url))
+                crawler_status["log"].append("服务器状态：正在访问TapTap游戏页面")
                 crawler_status["progress"] = 25
                 try:
                     crawler_status["log"].append("开始提取评论数据...")
+                    crawler_status["log"].append("服务器状态：页面滚动中，收集评论数据")
                     crawler_status["progress"] = 30
                     crawler.extract_comments(url)
-                    crawler_status["progress"] = 90
-                    crawler_status["log"].append('评论爬取完成！可以在"查看评论"页面查看结果')
+                    crawler_status["log"].append("数据提取完成")
+                    crawler_status["log"].append("服务器状态：TapTap评论数据已保存到output目录")
+                    crawler_status["progress"] = 100
                 except Exception as e:
-                    crawler_status["log"].append("爬取过程中出错: {}".format(str(e)))
+                    crawler_status["log"].append("提取数据时出错: {}".format(str(e)))
+                    crawler_status["log"].append("服务器状态：爬虫遇到错误，请检查URL是否有效")
             else:
-                crawler_status["log"].append("未提供URL，请在输入框中填写TapTap游戏URL")
-            
+                crawler_status["log"].append("未提供有效的TapTap URL")
+                crawler_status["log"].append("服务器状态：需要有效的游戏URL才能继续")
+        
         elif crawler_type == "bilibili":
             # 导入并运行Bilibili爬虫
             crawler_status["log"].append("正在导入Bilibili爬虫模块...")
+            crawler_status["log"].append("服务器状态：加载Bilibili爬虫依赖")
             crawler_status["progress"] = 10
-            from bili_crawler import BiliBiliCrawler
+            from bili_crawler import BiliCrawler
             
             # 初始化爬虫
             crawler_status["log"].append("正在初始化爬虫...")
+            crawler_status["log"].append("服务器状态：创建Chrome浏览器实例")
             crawler_status["progress"] = 15
-            crawler = BiliBiliCrawler(use_headless=True)
+            crawler = BiliCrawler(use_headless=True)
             
             # 更新日志
             crawler_status["log"].append("Bilibili爬虫已启动")
+            crawler_status["log"].append("服务器状态：爬虫初始化完成")
             crawler_status["progress"] = 20
             
             if url:
                 crawler_status["log"].append("正在爬取Bilibili评论: {}".format(url))
+                crawler_status["log"].append("服务器状态：正在访问Bilibili视频页面")
                 crawler_status["progress"] = 25
                 try:
                     crawler_status["log"].append("开始提取评论数据...")
+                    crawler_status["log"].append("服务器状态：页面解析中，提取视频评论数据")
                     crawler_status["progress"] = 30
                     crawler.extract_comments(url)
-                    crawler_status["progress"] = 90
-                    crawler_status["log"].append('评论爬取完成！可以在"查看评论"页面查看结果')
+                    crawler_status["log"].append("数据提取完成")
+                    crawler_status["log"].append("服务器状态：Bilibili评论数据已保存到output目录")
+                    crawler_status["progress"] = 100
                 except Exception as e:
-                    crawler_status["log"].append("爬取过程中出错: {}".format(str(e)))
+                    crawler_status["log"].append("提取数据时出错: {}".format(str(e)))
+                    crawler_status["log"].append("服务器状态：爬虫遇到错误，请检查URL是否有效")
             else:
-                crawler_status["log"].append("未提供URL，请在输入框中填写Bilibili视频URL")
+                crawler_status["log"].append("未提供有效的Bilibili URL")
+                crawler_status["log"].append("服务器状态：需要有效的视频URL才能继续")
         
-        # 更新进度到100%
-        crawler_status["progress"] = 100
-        crawler_status["log"].append("处理完成")
-    
+        else:
+            crawler_status["log"].append("未知的爬虫类型: {}".format(crawler_type))
+            crawler_status["log"].append("服务器状态：不支持的爬虫类型")
+            
     except Exception as e:
-        crawler_status["log"].append("错误：{}".format(str(e)))
-    
+        crawler_status["log"].append("爬虫运行出错: {}".format(str(e)))
+        crawler_status["log"].append("服务器状态：爬虫启动失败，请检查系统环境")
     finally:
         crawler_status["running"] = False
+        crawler_status["log"].append("爬虫任务结束")
 
 def main():
-    """主函数"""
+    """启动Flask应用"""
     # 确保目录存在
     Path("output").mkdir(exist_ok=True)
     Path("cookies").mkdir(exist_ok=True)
     
-    app.run(debug=True, host='0.0.0.0', port=5002)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
 if __name__ == "__main__":
     main() 

@@ -36,7 +36,31 @@ echo.
 echo 正在安装依赖...
 echo 注意: 使用更轻量级的依赖配置，使用内置csv模块替代pandas
 python -m pip install --upgrade pip
+
+REM 尝试安装所有依赖
 pip install -r requirements.txt
+if %ERRORLEVEL% NEQ 0 (
+    echo 某些依赖安装失败，尝试安装基本依赖...
+    
+    REM 创建临时无Pillow的依赖文件
+    type requirements.txt | findstr /v "pillow" > temp_requirements.txt
+    
+    REM 安装基本依赖
+    pip install -r temp_requirements.txt
+    if %ERRORLEVEL% NEQ 0 (
+        echo 基本依赖安装失败，请检查错误信息并解决问题。
+        exit /b 1
+    ) else (
+        echo 基本依赖安装成功，但Pillow安装失败。
+        echo 如果需要图片处理功能，请手动安装Pillow:
+        echo - Windows: 尝试使用预编译的二进制包: pip install pillow --only-binary :all:
+    )
+    
+    REM 清理临时文件
+    del temp_requirements.txt
+) else (
+    echo 所有依赖安装成功。
+)
 
 REM 创建必要的目录
 echo.

@@ -25,8 +25,19 @@ import json
 import sys
 import tempfile
 import shutil
-import pandas as pd
 from abc import ABC, abstractmethod
+import platform
+import io
+import random
+import logging
+import traceback
+from datetime import datetime, timedelta
+import urllib.parse
+from typing import Dict, List, Optional, Tuple, Union, Any
+from pathlib import Path
+from tqdm import tqdm
+from colorama import Fore, Style
+import requests
 
 class BaseCrawler(ABC):
     """爬虫基类，提供通用功能和抽象方法"""
@@ -84,27 +95,65 @@ class BaseCrawler(ABC):
         else:
             print("已禁用无头模式，浏览器将显示界面...")
         
+        # 检测操作系统并设置Chrome路径
+        os_name = platform.system()
+        chrome_path = None
+        
+        if os_name == "Darwin":  # macOS
+            print("检测到macOS系统")
+            possible_mac_paths = [
+                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                '/Applications/Google Chrome.app'
+            ]
+            for path in possible_mac_paths:
+                if os.path.exists(path):
+                    chrome_path = path
+                    print(f"在Mac上找到Chrome: {chrome_path}")
+                    break
+        elif os_name == "Windows":
+            print("检测到Windows系统")
+            possible_win_paths = [
+                'C:/Program Files/Google/Chrome/Application/chrome.exe',
+                'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+                os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Google/Chrome/Application/chrome.exe')
+            ]
+            for path in possible_win_paths:
+                if os.path.exists(path):
+                    chrome_path = path
+                    print(f"在Windows上找到Chrome: {chrome_path}")
+                    break
+        else:
+            print(f"检测到未支持的操作系统: {os_name}，将尝试使用默认设置")
+        
+        # 如果找到Chrome路径，添加到选项中
+        if chrome_path:
+            chrome_options.binary_location = chrome_path
+            print(f"已设置Chrome路径: {chrome_path}")
+        else:
+            print("未找到Chrome安装路径，将尝试使用默认路径")
+        
         # 尝试多种方式初始化浏览器
         driver = None
         try:
-            # 方法1: 直接使用webdriver.Chrome()
+            # 方法1: 使用ChromeDriverManager并指定浏览器路径
             print("尝试初始化浏览器方式1...")
-            driver = webdriver.Chrome(options=chrome_options)
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
             print("浏览器初始化成功 (方式1)")
         except Exception as e:
             print(f"初始化方式1失败: {e}")
             try:
-                # 方法2: 使用service但不使用ChromeDriverManager
+                # 方法2: 直接使用webdriver.Chrome()
                 print("尝试初始化浏览器方式2...")
-                service = Service()
-                driver = webdriver.Chrome(service=service, options=chrome_options)
+                driver = webdriver.Chrome(options=chrome_options)
                 print("浏览器初始化成功 (方式2)")
             except Exception as e:
                 print(f"初始化方式2失败: {e}")
                 try:
-                    # 方法3: 使用ChromeDriverManager
+                    # 方法3: 使用service但不使用ChromeDriverManager
                     print("尝试初始化浏览器方式3...")
-                    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+                    service = Service()
+                    driver = webdriver.Chrome(service=service, options=chrome_options)
                     print("浏览器初始化成功 (方式3)")
                 except Exception as e:
                     print(f"所有浏览器初始化方法都失败: {e}")
@@ -578,16 +627,12 @@ class CsvWriter(DataWriter):
             sys.exit(1)
 
 class ExcelWriter(DataWriter):
-    """Excel数据写入器"""
+    """使用CSV写入数据（原Excel格式改为CSV）"""
     
     def write(self, data, filename):
-        """
-        写入数据到Excel文件
-        
-        参数:
-            data: 要写入的数据行（字典列表）
-            filename: Excel文件名
-        """
+        """将数据写入文件，如果文件存在则追加，否则创建新文件"""
+        # 将Excel文件名改为CSV
+        filename = filename.replace('.xlsx', '.csv')
         file_exists = os.path.isfile(filename)
         max_retries = 50
         retries = 0
@@ -595,30 +640,50 @@ class ExcelWriter(DataWriter):
         while retries < max_retries:
             try:
                 if file_exists:
-                    # 如果文件存在，读取现有数据
+                    # 如果文件存在，读取现有数据并追加
                     try:
-                        # 读取现有的Excel文件
-                        existing_df = pd.read_excel(filename)
-                        # 将新数据添加到DataFrame
-                        new_df = pd.DataFrame(data)
-                        updated_df = pd.concat([existing_df, new_df], ignore_index=True)
-                        # 保存更新后的DataFrame到Excel
-                        updated_df.to_excel(filename, index=False)
+                        # 读取现有的CSV文件
+                        existing_data = []
+                        with open(filename, 'r', encoding='utf-8', newline='') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                existing_data.append(row)
+                        
+                        # 合并现有数据和新数据
+                        combined_data = existing_data + data
+                        
+                        # 保存合并后的数据
+                        if combined_data:
+                            fieldnames = combined_data[0].keys()
+                            with open(filename, 'w', encoding='utf-8', newline='') as f:
+                                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                                writer.writeheader()
+                                writer.writerows(combined_data)
                     except Exception as e:
-                        print(f"读取或更新Excel文件时出错: {e}")
+                        print(f"读取或更新CSV文件时出错: {e}")
                         # 如果读取失败，创建新文件
-                        pd.DataFrame(data).to_excel(filename, index=False)
+                        if data:
+                            fieldnames = data[0].keys()
+                            with open(filename, 'w', encoding='utf-8', newline='') as f:
+                                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                                writer.writeheader()
+                                writer.writerows(data)
                 else:
                     # 如果文件不存在，创建新文件
-                    pd.DataFrame(data).to_excel(filename, index=False)
+                    if data:
+                        fieldnames = data[0].keys()
+                        with open(filename, 'w', encoding='utf-8', newline='') as f:
+                            writer = csv.DictWriter(f, fieldnames=fieldnames)
+                            writer.writeheader()
+                            writer.writerows(data)
                 break  # 如果成功写入，跳出循环
             except PermissionError as e:
                 retries += 1
-                print(f"将爬取到的数据写入Excel时，遇到权限错误Permission denied，文件可能被占用或无写入权限: {e}")
+                print(f"将爬取到的数据写入CSV时，遇到权限错误Permission denied，文件可能被占用或无写入权限: {e}")
                 print(f"等待10s后重试，将会重试50次... (尝试 {retries}/{max_retries})")
                 time.sleep(10)  # 等待10秒后重试
         else:
-            print("将爬取到的数据写入Excel时遇到权限错误，且已达到最大重试次数50次，退出程序")
+            print("将爬取到的数据写入CSV时遇到权限错误，且已达到最大重试次数50次，退出程序")
             sys.exit(1)
 
 # 辅助函数

@@ -117,4 +117,5 @@ backup_files/
 cookies/*.pkl
 
 # Output data (can be large and user-specific)
-# output/* 
+output/*
+!output/.gitkeep 

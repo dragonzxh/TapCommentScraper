@@ -17,5 +17,10 @@ click>=8.0.0
 # 工具与开发依赖
 tqdm>=4.62.0
 colorama>=0.4.4
+# Pillow可能需要系统级依赖
+# 如果安装失败：
+# - Mac: brew install libjpeg libtiff little-cms2 webp openjpeg
+# - Ubuntu: sudo apt-get install libjpeg-dev zlib1g-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev
+# - Windows: 通常可以直接安装，或尝试使用预编译的二进制包：pip install pillow --only-binary :all:
 pillow>=8.3.1
 python-dotenv>=0.19.0 

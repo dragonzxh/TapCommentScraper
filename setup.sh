@@ -51,7 +51,33 @@ esac
 echo -e "\n正在安装依赖..."
 echo "注意: 使用更轻量级的依赖配置，使用内置csv模块替代pandas"
 pip install --upgrade pip
-pip install -r requirements.txt
+
+# 尝试安装所有依赖
+if pip install -r requirements.txt; then
+    echo "所有依赖安装成功。"
+else
+    echo "某些依赖安装失败，尝试安装基本依赖..."
+    
+    # 创建临时无Pillow的依赖文件
+    grep -v "pillow" requirements.txt > temp_requirements.txt
+    
+    # 安装基本依赖
+    if pip install -r temp_requirements.txt; then
+        echo "基本依赖安装成功，但Pillow安装失败。"
+        echo "如果需要图片处理功能，请手动安装Pillow:"
+        echo "- Mac: brew install libjpeg libtiff little-cms2 webp openjpeg"
+        echo "  然后: pip install pillow"
+        echo "- Ubuntu: sudo apt-get install libjpeg-dev zlib1g-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev"
+        echo "  然后: pip install pillow"
+        echo "- Windows: 尝试使用预编译的二进制包: pip install pillow --only-binary :all:"
+    else
+        echo "基本依赖安装失败，请检查错误信息并解决问题。"
+        exit 1
+    fi
+    
+    # 清理临时文件
+    rm temp_requirements.txt
+fi
 
 # 创建必要的目录
 echo -e "\n创建工作目录..."
