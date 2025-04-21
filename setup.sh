@@ -49,8 +49,9 @@ esac
 
 # 安装依赖
 echo -e "\n正在安装依赖..."
+echo "注意: 使用更轻量级的依赖配置，使用内置csv模块替代pandas"
 pip install --upgrade pip
-pip install -r requirements_full.txt
+pip install -r requirements.txt
 
 # 创建必要的目录
 echo -e "\n创建工作目录..."

@@ -34,8 +34,9 @@ call venv\Scripts\activate.bat
 REM 安装依赖
 echo.
 echo 正在安装依赖...
+echo 注意: 使用更轻量级的依赖配置，使用内置csv模块替代pandas
 python -m pip install --upgrade pip
-pip install -r requirements_full.txt
+pip install -r requirements.txt
 
 REM 创建必要的目录
 echo.

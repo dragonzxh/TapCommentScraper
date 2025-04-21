@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>已爬取评论列表 - 游戏评论爬虫工具</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 5px;
+            min-height: 100vh;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 10px;
+        }
+        .file-list {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .file-list th, .file-list td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .file-list th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .file-list tr:hover {
+            background-color: #f9f9f9;
+        }
+        .file-name {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .file-name:hover {
+            text-decoration: underline;
+        }
+        .empty-message {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-style: italic;
+        }
+        .btn-back {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 8px 15px;
+            background-color: #0066cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+        }
+        .btn-back:hover {
+            background-color: #0052a3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>已爬取评论列表</h1>
+        
+        {% if files %}
+        <table class="file-list">
+            <thead>
+                <tr>
+                    <th>文件名</th>
+                    <th>文件大小</th>
+                    <th>修改时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in files %}
+                <tr>
+                    <td>{{ file.filename }}</td>
+                    <td>{{ file.size }}</td>
+                    <td>{{ file.modified }}</td>
+                    <td>
+                        <a href="{{ url_for('view_comment_file', file_path=file.filename) }}" class="file-name">查看详情</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-message">
+            <p>目前没有爬取的评论数据。请先运行爬虫爬取评论！</p>
+        </div>
+        {% endif %}
+        
+        <a href="/" class="btn-back">返回首页</a>
+    </div>
+</body>
+</html> 

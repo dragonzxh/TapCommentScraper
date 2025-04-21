@@ -1,11 +1,10 @@
 # 基础依赖
 beautifulsoup4>=4.9.3
 selenium>=4.0.0
-pandas>=1.3.0
+# pandas已移除，使用内置csv模块替代
 openpyxl>=3.0.7
 webdriver_manager>=3.8.0
 requests>=2.26.0
-numpy>=1.21.0
 python-dateutil>=2.8.2
 
 # Web界面依赖
@@ -14,11 +13,6 @@ werkzeug>=2.0.0
 jinja2>=3.0.0
 itsdangerous>=2.0.0
 click>=8.0.0
-
-# 数据处理与分析
-scikit-learn>=1.0.0
-matplotlib>=3.4.0
-seaborn>=0.11.0
 
 # 工具与开发依赖
 tqdm>=4.62.0
