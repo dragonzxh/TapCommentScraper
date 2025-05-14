@@ -517,27 +517,40 @@ class SteamCrawler(BaseCrawler):
             print(f"处理年龄验证时出错: {e}")
             return False
     
-    def save_comments(self, comments, app_id):
+    def save_comments(self, comments, app_id, game_name=""):
         """保存评论到文件
         
         Args:
             comments: 评论数据列表
             app_id: 游戏ID
+            game_name: 游戏名称
         """
         try:
             # 创建输出目录
             output_dir = "output"
             os.makedirs(output_dir, exist_ok=True)
             
-            # 生成文件名
+            # 生成文件名，如果有游戏名称则加入文件名
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            csv_filename = os.path.join(output_dir, f"{app_id}_comments_{timestamp}.csv")
+            
+            # 清理游戏名称中的非法字符
+            if game_name and game_name != app_id:
+                # 移除Windows文件名中的非法字符
+                game_name = re.sub(r'[\\/*?:"<>|]', "", game_name)
+                # 限制名称长度
+                if len(game_name) > 50:
+                    game_name = game_name[:47] + "..."
+                file_prefix = f"{app_id}_{game_name}"
+            else:
+                file_prefix = app_id
+                
+            csv_filename = os.path.join(output_dir, f"{file_prefix}_comments_{timestamp}.csv")
             
             # 保存为CSV
             with open(csv_filename, 'w', encoding='utf-8-sig', newline='') as f:
                 writer = csv.writer(f)
                 # 写入表头
-                writer.writerow(['编号', '用户名', '用户ID', '评分', '评论内容', '发布时间', '游戏时长', '有用数', '好笑数', '游戏ID'])
+                writer.writerow(['编号', '用户名', '用户ID', '评分', '评论内容', '发布时间', '游戏时长', '有用数', '好笑数', '游戏ID', '游戏名称'])
                 # 写入数据
                 for i, comment in enumerate(comments, 1):
                     writer.writerow([
@@ -550,15 +563,18 @@ class SteamCrawler(BaseCrawler):
                         comment.get('play_time', ''),
                         comment.get('helpful_count', 0),
                         comment.get('funny_count', 0),
-                        app_id
+                        app_id,
+                        game_name
                     ])
             
             print(f"\n评论已保存到: {csv_filename}")
             
             # 同时保存为TXT格式
-            txt_filename = os.path.join(output_dir, f"{app_id}_comments_{timestamp}.txt")
+            txt_filename = os.path.join(output_dir, f"{file_prefix}_comments_{timestamp}.txt")
             with open(txt_filename, 'w', encoding='utf-8') as f:
                 f.write(f"游戏ID: {app_id}\n")
+                if game_name and game_name != app_id:
+                    f.write(f"游戏名称: {game_name}\n")
                 f.write(f"爬取时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"评论数量: {len(comments)}\n\n")
                 f.write("="*50 + "\n\n")
@@ -596,6 +612,10 @@ class SteamCrawler(BaseCrawler):
             match = re.search(r'/app/(\d+)', url)
             if match:
                 app_id = match.group(1)
+            
+            # 获取游戏名称
+            game_name = self.get_game_name(app_id)
+            print(f"获取到游戏名称: {game_name}")
             
             # 设置筛选条件：热门评论+中文
             review_url = url
@@ -689,7 +709,7 @@ class SteamCrawler(BaseCrawler):
             # 保存所有评论
             if all_comments:
                 print(f"\n共爬取到 {len(all_comments)} 条评论，正在保存...")
-                self.save_comments(all_comments, app_id)
+                self.save_comments(all_comments, app_id, game_name)
                 
             return all_comments
             
@@ -811,6 +831,72 @@ class SteamCrawler(BaseCrawler):
         except Exception as e:
             print(f"提取评论数据时出错: {str(e)}")
             return None
+    
+    def get_game_name(self, app_id):
+        """获取游戏名称
+        
+        Args:
+            app_id: 游戏ID
+            
+        Returns:
+            str: 游戏名称
+        """
+        try:
+            # 访问游戏商店页面
+            store_url = f"https://store.steampowered.com/app/{app_id}/"
+            print(f"正在访问游戏商店页面: {store_url}")
+            
+            # 打开一个新标签页
+            self.driver.execute_script("window.open('');")
+            # 切换到新标签页
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            
+            # 加载商店页面
+            self.driver.get(store_url)
+            time.sleep(2)
+            
+            # 处理年龄验证页面
+            self.handle_age_check()
+            
+            # 尝试获取游戏标题
+            title_selectors = [
+                ".apphub_AppName",
+                "#appHubAppName",
+                ".game_title",
+                ".game_name",
+                ".pageheader",
+                "h1", 
+                ".game_description_title",
+                "[itemprop='name']"
+            ]
+            
+            game_name = ""
+            for selector in title_selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        if element.is_displayed() and element.text.strip():
+                            game_name = element.text.strip()
+                            break
+                    if game_name:
+                        break
+                except Exception as e:
+                    print(f"使用选择器 {selector} 提取游戏名称时出错: {e}")
+                    continue
+            
+            # 关闭新标签页，切换回原标签页
+            self.driver.close()
+            self.driver.switch_to.window(self.driver.window_handles[0])
+            
+            if not game_name:
+                print(f"无法获取游戏名称，将使用游戏ID代替")
+                return app_id
+                
+            return game_name
+            
+        except Exception as e:
+            print(f"获取游戏名称时出错: {e}")
+            return app_id
     
     def close(self):
         """关闭浏览器"""

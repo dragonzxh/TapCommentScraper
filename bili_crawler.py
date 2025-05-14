@@ -159,6 +159,10 @@ class BiliCrawler(BaseCrawler):
                 self.save_progress(self.progress)
                 return
         
+        # 获取视频标题
+        video_title = self.get_video_title()
+        print(f"获取到视频标题: {video_title}")
+        
         # 处理迷你播放器
         self.handle_mini_player()
         
@@ -203,7 +207,15 @@ class BiliCrawler(BaseCrawler):
         print(f"找到 {len(reply_items)} 条一级评论，开始处理...")
         
         # 创建文件名
-        csv_filename = f"{video_id}_comments.csv"
+        if video_title and video_title != video_id:
+            # 清理视频标题中的非法字符
+            video_title = re.sub(r'[\\/*?:"<>|]', "", video_title)
+            # 限制标题长度
+            if len(video_title) > 50:
+                video_title = video_title[:47] + "..."
+            csv_filename = f"{video_id}_{video_title}_comments.csv"
+        else:
+            csv_filename = f"{video_id}_comments.csv"
         
         # 初始化列表存储评论数据
         comments_data = []
@@ -398,6 +410,62 @@ class BiliCrawler(BaseCrawler):
         except Exception as e:
             print(f"获取二级评论失败: {e}")
             return []
+
+    def get_video_title(self):
+        """获取B站视频标题
+        
+        Returns:
+            str: 视频标题
+        """
+        try:
+            # 尝试获取视频标题
+            title_selectors = [
+                "h1.video-title",
+                ".video-title",
+                ".title",
+                ".tit",
+                "h1",
+                ".video-info-title",
+                "[data-title]",
+                ".head-title",
+                ".media-title",
+                "[class*='title']:not([class*='sub']):not([class*='meta'])"
+            ]
+            
+            video_title = ""
+            for selector in title_selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        if element.is_displayed() and element.text.strip():
+                            video_title = element.text.strip()
+                            print(f"使用选择器 {selector} 找到视频标题: {video_title}")
+                            break
+                    if video_title:
+                        break
+                except Exception as e:
+                    continue
+            
+            # 尝试从页面标题中提取
+            if not video_title:
+                try:
+                    page_title = self.driver.title
+                    if page_title:
+                        # 移除页面标题中的常见后缀
+                        video_title = re.sub(r'_哔哩哔哩.*$|_bilibili.*$|\s*-\s*bilibili$', '', page_title).strip()
+                        print(f"从页面标题中找到视频标题: {video_title}")
+                except Exception as e:
+                    pass
+            
+            if not video_title:
+                print(f"无法获取视频标题，将使用视频ID代替")
+                return ""
+                
+            return video_title
+            
+        except Exception as e:
+            print(f"获取视频标题时出错: {e}")
+            return ""
 
 if __name__ == "__main__":
     try:

@@ -103,6 +103,10 @@ class TapCrawler(BaseCrawler):
         # 提取游戏ID
         game_id = self.extract_game_id(url)
         
+        # 获取游戏名称
+        game_name = self.get_game_name(url, game_id)
+        print(f"获取到游戏名称: {game_name}")
+        
         # 设置页面加载超时时间
         self.driver.set_page_load_timeout(90)  # 增加到90秒超时
         try:
@@ -158,7 +162,15 @@ class TapCrawler(BaseCrawler):
         print(f"开始处理 {len(all_reply_items)} 条评论...")
         
         # 创建文件名
-        excel_filename = f"{game_id}_comments.xlsx"
+        if game_name and game_name != game_id:
+            # 清理游戏名称中的非法字符
+            game_name = re.sub(r'[\\/*?:"<>|]', "", game_name)
+            # 限制名称长度
+            if len(game_name) > 50:
+                game_name = game_name[:47] + "..."
+            excel_filename = f"{game_id}_{game_name}_comments.xlsx"
+        else:
+            excel_filename = f"{game_id}_comments.xlsx"
         
         # 初始化计数器
         total_comments = len(all_reply_items)
@@ -510,6 +522,93 @@ class TapCrawler(BaseCrawler):
             '点赞数': like_count,
             'URL': url
         }
+
+    def get_game_name(self, url, game_id):
+        """获取游戏名称
+        
+        Args:
+            url: 游戏URL
+            game_id: 游戏ID
+            
+        Returns:
+            str: 游戏名称
+        """
+        try:
+            # 如果URL没有指向游戏页面，则构造游戏页面URL
+            if "taptap.cn/app/" not in url and "taptap.com/app/" not in url:
+                url = f"https://www.taptap.cn/app/{game_id}"
+                
+            # 已经在游戏页面，尝试获取标题
+            print(f"正在从当前页面获取游戏名称...")
+                
+            # 尝试从当前页面获取游戏名称
+            title_selectors = [
+                "h1.app-header-title",
+                ".app-header-title",
+                ".title",
+                ".header-title",
+                ".name",
+                "h1.title",
+                "h1",
+                ".app-name",
+                "[class*='title']:not([class*='sub']):not([class*='meta'])",
+                "[class*='name']:not([class*='user']):not([class*='author'])"
+            ]
+            
+            game_name = ""
+            for selector in title_selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        if element.is_displayed() and element.text.strip():
+                            game_name = element.text.strip()
+                            print(f"使用选择器 {selector} 找到游戏名称: {game_name}")
+                            break
+                    if game_name:
+                        break
+                except Exception as e:
+                    continue
+            
+            # 如果当前页面找不到游戏名称，尝试访问游戏主页面
+            if not game_name:
+                print(f"当前页面未找到游戏名称，尝试访问游戏主页...")
+                
+                # 打开新标签页访问游戏主页
+                self.driver.execute_script("window.open('');")
+                self.driver.switch_to.window(self.driver.window_handles[-1])
+                game_url = f"https://www.taptap.cn/app/{game_id}"
+                
+                try:
+                    self.driver.get(game_url)
+                    time.sleep(3)  # 等待页面加载
+                    
+                    # 再次尝试获取游戏名称
+                    for selector in title_selectors:
+                        try:
+                            elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                            for element in elements:
+                                if element.is_displayed() and element.text.strip():
+                                    game_name = element.text.strip()
+                                    print(f"从游戏主页使用选择器 {selector} 找到游戏名称: {game_name}")
+                                    break
+                            if game_name:
+                                break
+                        except Exception:
+                            continue
+                finally:
+                    # 关闭新标签页，切回原来的标签页
+                    self.driver.close()
+                    self.driver.switch_to.window(self.driver.window_handles[0])
+            
+            if not game_name:
+                print(f"无法获取游戏名称，将使用游戏ID代替")
+                return game_id
+                
+            return game_name
+            
+        except Exception as e:
+            print(f"获取游戏名称时出错: {e}")
+            return game_id
 
 if __name__ == "__main__":
     try:
