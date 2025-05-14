@@ -60,6 +60,30 @@
             border: 1px solid #ddd;
             border-radius: 4px;
         }
+        .id-input {
+            width: 60%;
+            display: inline-block;
+        }
+        .url-input {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+        .input-group .prefix {
+            background-color: #f1f1f1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-right: none;
+            border-radius: 4px 0 0 4px;
+            color: #666;
+        }
+        .input-group input {
+            border-radius: 0 4px 4px 0;
+        }
         button {
             background-color: #4CAF50;
             color: white;
@@ -115,6 +139,11 @@
         .view-comments-btn:hover {
             background-color: #0052a3;
         }
+        .info-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -130,8 +159,14 @@
             
             <div id="steam-form" class="crawler-form">
                 <div class="form-group">
-                    <label for="steam-url">Steam游戏URL：</label>
-                    <input type="text" id="steam-url" placeholder="例如：https://steamcommunity.com/app/1295660/reviews/">
+                    <label for="steam-id">Steam游戏ID：</label>
+                    <div class="input-group">
+                        <span class="prefix">AppID:</span>
+                        <input type="text" id="steam-id" class="id-input" placeholder="例如：1295660" oninput="updateSteamUrl()">
+                    </div>
+                    <p class="info-text">只需要输入Steam游戏的AppID，系统将自动生成完整URL。</p>
+                    <div class="url-input" id="steam-url-display">完整URL: https://steamcommunity.com/app/<span id="steam-id-display">1295660</span>/reviews/</div>
+                    <input type="hidden" id="steam-url">
                 </div>
                 <div class="form-group">
                     <label for="steam-headless">是否使用无头模式：</label>
@@ -145,8 +180,14 @@
             
             <div id="taptap-form" class="crawler-form" style="display: none;">
                 <div class="form-group">
-                    <label for="taptap-url">TapTap游戏URL：</label>
-                    <input type="text" id="taptap-url" placeholder="例如：https://www.taptap.com/app/12345">
+                    <label for="taptap-id">TapTap游戏ID：</label>
+                    <div class="input-group">
+                        <span class="prefix">GameID:</span>
+                        <input type="text" id="taptap-id" class="id-input" placeholder="例如：12345" oninput="updateTaptapUrl()">
+                    </div>
+                    <p class="info-text">只需要输入TapTap游戏的ID，系统将自动生成完整URL。</p>
+                    <div class="url-input" id="taptap-url-display">完整URL: https://www.taptap.com/app/<span id="taptap-id-display">12345</span></div>
+                    <input type="hidden" id="taptap-url">
                 </div>
                 <div class="form-group">
                     <label for="taptap-headless">是否使用无头模式：</label>
@@ -160,8 +201,14 @@
             
             <div id="bilibili-form" class="crawler-form" style="display: none;">
                 <div class="form-group">
-                    <label for="bilibili-url">Bilibili视频URL：</label>
-                    <input type="text" id="bilibili-url" placeholder="例如：https://www.bilibili.com/video/BV1xx411c7mD">
+                    <label for="bilibili-id">Bilibili视频ID：</label>
+                    <div class="input-group">
+                        <span class="prefix">BV号:</span>
+                        <input type="text" id="bilibili-id" class="id-input" placeholder="例如：BV1xx411c7mD" oninput="updateBilibiliUrl()">
+                    </div>
+                    <p class="info-text">只需要输入Bilibili视频的BV号，系统将自动生成完整URL。</p>
+                    <div class="url-input" id="bilibili-url-display">完整URL: https://www.bilibili.com/video/<span id="bilibili-id-display">BV1xx411c7mD</span></div>
+                    <input type="hidden" id="bilibili-url">
                 </div>
                 <div class="form-group">
                     <label for="bilibili-headless">是否使用无头模式：</label>
@@ -208,6 +255,34 @@
             });
         });
         
+        // 更新Steam URL
+        function updateSteamUrl() {
+            const steamId = document.getElementById('steam-id').value || '1295660';
+            document.getElementById('steam-id-display').textContent = steamId;
+            document.getElementById('steam-url').value = `https://steamcommunity.com/app/${steamId}/reviews/`;
+        }
+        
+        // 更新TapTap URL
+        function updateTaptapUrl() {
+            const taptapId = document.getElementById('taptap-id').value || '12345';
+            document.getElementById('taptap-id-display').textContent = taptapId;
+            document.getElementById('taptap-url').value = `https://www.taptap.com/app/${taptapId}`;
+        }
+        
+        // 更新Bilibili URL
+        function updateBilibiliUrl() {
+            const bilibiliId = document.getElementById('bilibili-id').value || 'BV1xx411c7mD';
+            document.getElementById('bilibili-id-display').textContent = bilibiliId;
+            document.getElementById('bilibili-url').value = `https://www.bilibili.com/video/${bilibiliId}`;
+        }
+        
+        // 页面加载时初始化URL
+        window.onload = function() {
+            updateSteamUrl();
+            updateTaptapUrl();
+            updateBilibiliUrl();
+        };
+        
         // 启动爬虫
         function startCrawler(type) {
             const progressBar = document.getElementById('progress-bar');
@@ -221,6 +296,12 @@
                 url = document.getElementById('taptap-url').value;
             } else if (type === 'bilibili') {
                 url = document.getElementById('bilibili-url').value;
+            }
+            
+            // 检查ID是否填写
+            if (!url || url.includes('undefined')) {
+                logContainer.innerHTML = '<div class="log-line">错误：请输入有效的游戏/视频ID</div>';
+                return;
             }
             
             // 重置进度和日志
@@ -258,11 +339,11 @@
             fetch('/api/status')
             .then(response => response.json())
             .then(data => {
-                // 更新进度
+                // 更新进度条
                 progressBar.style.width = `${data.progress}%`;
                 progressBar.textContent = `${data.progress}%`;
                 
-                // 更新日志（保留旧内容）
+                // 更新日志
                 logContainer.innerHTML = '';
                 data.log.forEach(line => {
                     logContainer.innerHTML += `<div class="log-line">${line}</div>`;
@@ -271,37 +352,13 @@
                 // 自动滚动到底部
                 logContainer.scrollTop = logContainer.scrollHeight;
                 
-                // 如果爬虫还在运行，继续轮询 (增加轮询频率)
+                // 如果爬虫仍在运行，继续轮询
                 if (data.running) {
-                    setTimeout(pollStatus, 500); // 从1000毫秒改为500毫秒
-                } else {
-                    // 爬虫已停止，再轮询一次确保获取最终状态
-                    setTimeout(() => {
-                        fetch('/api/status')
-                        .then(response => response.json())
-                        .then(finalData => {
-                            // 最终更新日志
-                            logContainer.innerHTML = '';
-                            finalData.log.forEach(line => {
-                                logContainer.innerHTML += `<div class="log-line">${line}</div>`;
-                            });
-                            logContainer.scrollTop = logContainer.scrollHeight;
-                            
-                            // 显示完成消息
-                            if (finalData.progress === 100) {
-                                logContainer.innerHTML += `<div class="log-line" style="color: #4CAF50; font-weight: bold;">✓ 任务已完成</div>`;
-                            } else {
-                                logContainer.innerHTML += `<div class="log-line" style="color: #f44336; font-weight: bold;">✗ 任务已停止</div>`;
-                            }
-                            logContainer.scrollTop = logContainer.scrollHeight;
-                        });
-                    }, 1000);
+                    setTimeout(pollStatus, 1000);
                 }
             })
             .catch(error => {
-                logContainer.innerHTML += `<div class="log-line" style="color: #f44336;">错误：${error.message}</div>`;
-                // 出错后继续轮询
-                setTimeout(pollStatus, 2000);
+                logContainer.innerHTML += `<div class="log-line">错误：${error.message}</div>`;
             });
         }
     </script>

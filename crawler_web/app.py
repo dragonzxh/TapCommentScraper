@@ -78,8 +78,32 @@ def start_crawler():
     crawler_type = data.get('type')
     url = data.get('url', '')
     
+    # 验证爬虫类型
     if crawler_type not in ['steam', 'taptap', 'bilibili']:
         return jsonify({"success": False, "message": "不支持的爬虫类型"})
+    
+    # 验证URL格式
+    if not url:
+        return jsonify({"success": False, "message": "请输入有效的URL或ID"})
+    
+    # 格式化URL (如果用户只输入了ID)
+    if crawler_type == 'steam' and not url.startswith('http'):
+        # 如果只输入了数字ID，添加完整URL前缀
+        if url.isdigit():
+            url = f"https://steamcommunity.com/app/{url}/reviews/"
+    
+    elif crawler_type == 'taptap' and not url.startswith('http'):
+        # 如果只输入了数字ID，添加完整URL前缀
+        if url.isdigit():
+            url = f"https://www.taptap.com/app/{url}"
+    
+    elif crawler_type == 'bilibili' and not url.startswith('http'):
+        # 如果只输入了BV号，添加完整URL前缀
+        if url.startswith('BV') or url.isdigit():
+            url = f"https://www.bilibili.com/video/{url}"
+    
+    # 记录格式化后的URL
+    formatted_url = url
     
     # 重置状态
     crawler_status = {
@@ -87,11 +111,11 @@ def start_crawler():
         "progress": 0,
         "log": ["正在启动爬虫..."],
         "type": crawler_type,
-        "url": url
+        "url": formatted_url
     }
     
     # 启动爬虫线程
-    thread = threading.Thread(target=run_crawler, args=(crawler_type, url))
+    thread = threading.Thread(target=run_crawler, args=(crawler_type, formatted_url))
     thread.daemon = True
     thread.start()
     
@@ -325,7 +349,8 @@ def main():
     Path("output").mkdir(exist_ok=True)
     Path("cookies").mkdir(exist_ok=True)
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # 修改为localhost，更好地支持Windows环境
+    app.run(debug=True, host='localhost', port=5000)
 
 if __name__ == "__main__":
     main() 
