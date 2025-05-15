@@ -161,34 +161,148 @@ def login_and_save_cookies():
             # 访问年龄验证游戏
             verify_age = input("\n是否访问年龄验证游戏以通过年龄验证？ [y/n]: ").strip().lower() == 'y'
             if verify_age:
-                print("\n正在访问年龄验证游戏...")
-                driver.get("https://store.steampowered.com/app/271590/Grand_Theft_Auto_V/")  # GTA5，需要年龄验证的游戏
+                print("\n选择要访问的年龄验证游戏：")
+                print("1. GTA5 (美国游戏)")
+                print("2. 赛博朋克2077 (波兰游戏)")
+                print("3. 巫师3 (波兰游戏)")
+                print("4. 只狼：影逝二度 (日本游戏)")
+                print("5. 鬼泣5 (日本游戏)")
+                
+                game_choice = input("请选择 [1-5，默认1]: ").strip()
+                
+                # 根据选择设置游戏URL
+                game_urls = {
+                    "1": "https://store.steampowered.com/app/271590/Grand_Theft_Auto_V/",  # GTA5
+                    "2": "https://store.steampowered.com/app/1091500/Cyberpunk_2077/",     # 赛博朋克2077
+                    "3": "https://store.steampowered.com/app/292030/The_Witcher_3_Wild_Hunt/", # 巫师3
+                    "4": "https://store.steampowered.com/app/814380/Sekiro_Shadows_Die_Twice__GOTY_Edition/", # 只狼
+                    "5": "https://store.steampowered.com/app/601150/Devil_May_Cry_5/"      # 鬼泣5
+                }
+                
+                game_url = game_urls.get(game_choice, game_urls["1"])
+                game_name = {
+                    "1": "GTA5",
+                    "2": "赛博朋克2077",
+                    "3": "巫师3",
+                    "4": "只狼：影逝二度",
+                    "5": "鬼泣5"
+                }.get(game_choice, "GTA5")
+                
+                print(f"\n正在访问 {game_name} 游戏页面进行年龄验证...")
+                driver.get(game_url)
                 time.sleep(3)
                 
                 # 尝试通过年龄验证
                 try:
-                    # 尝试查找年龄选择下拉框
-                    age_selects = driver.find_elements(By.CSS_SELECTOR, "select[name='ageYear']")
-                    if age_selects:
-                        print("检测到年龄验证页面，尝试选择年龄...")
-                        driver.execute_script("document.querySelector('select[name=\"ageYear\"]').value = '1990'")
-                        view_buttons = driver.find_elements(By.CSS_SELECTOR, "a.btnv6_blue_hoverfade")
-                        for button in view_buttons:
-                            if "view" in button.text.lower():
-                                driver.execute_script("arguments[0].click();", button)
-                                time.sleep(5)  # 等待页面加载
-                                print("年龄验证完成！")
-                                
-                                # 重新保存Cookies（可能更新了验证相关Cookie）
-                                cookies = driver.get_cookies()
-                                with open(cookie_path, "wb") as f:
-                                    pickle.dump(cookies, f)
-                                print("Cookies已更新!")
-                                break
+                    # 方法1：最新版的Steam年龄验证 - 日期选择器
+                    try:
+                        # 尝试找到日期选择器并设置
+                        day_select = driver.find_element(By.ID, "ageDay")
+                        month_select = driver.find_element(By.ID, "ageMonth")
+                        year_select = driver.find_element(By.ID, "ageYear")
+                        
+                        # 使用JavaScript设置日期为1990年1月1日
+                        driver.execute_script("arguments[0].value = '1';", day_select)
+                        driver.execute_script("arguments[0].value = 'January';", month_select)
+                        driver.execute_script("arguments[0].value = '1990';", year_select)
+                        
+                        print("已设置出生日期为1990年1月1日")
+                        time.sleep(1)
+                        
+                        # 点击查看页面按钮
+                        submit_button = driver.find_element(By.CSS_SELECTOR, ".btnv6_blue_hoverfade")
+                        driver.execute_script("arguments[0].click();", submit_button)
+                        print("已点击提交按钮")
+                        time.sleep(5)
+                        
+                        # 检查是否成功通过验证
+                        if "agecheck" not in driver.current_url.lower():
+                            print("年龄验证完成！")
+                            
+                            # 重新保存Cookies
+                            cookies = driver.get_cookies()
+                            with open(cookie_path, "wb") as f:
+                                pickle.dump(cookies, f)
+                            print("Cookies已更新！")
+                    except Exception as e:
+                        print(f"尝试方法1失败: {e}")
+                    
+                    # 方法2：旧版Steam年龄验证 - 年份下拉框
+                    if "agecheck" in driver.current_url.lower() or "mature_content" in driver.page_source.lower():
+                        try:
+                            # 尝试查找年龄选择下拉框
+                            age_selects = driver.find_elements(By.CSS_SELECTOR, "select[name='ageYear']")
+                            if age_selects:
+                                print("检测到旧版年龄验证页面，尝试选择年龄...")
+                                driver.execute_script("document.querySelector('select[name=\"ageYear\"]').value = '1990'")
+                                view_buttons = driver.find_elements(By.CSS_SELECTOR, "a.btnv6_blue_hoverfade, [type='submit']")
+                                for button in view_buttons:
+                                    if ("view" in button.text.lower() or 
+                                        "enter" in button.text.lower() or 
+                                        "continue" in button.text.lower() or
+                                        "查看" in button.text.lower()):
+                                        driver.execute_script("arguments[0].click();", button)
+                                        time.sleep(5)  # 等待页面加载
+                                        
+                                        # 检查是否成功通过验证
+                                        if "agecheck" not in driver.current_url.lower():
+                                            print("年龄验证完成！")
+                                            
+                                            # 重新保存Cookies
+                                            cookies = driver.get_cookies()
+                                            with open(cookie_path, "wb") as f:
+                                                pickle.dump(cookies, f)
+                                            print("Cookies已更新！")
+                                            break
+                        except Exception as e:
+                            print(f"尝试方法2失败: {e}")
+                    
+                    # 方法3：直接点击确认按钮
+                    if "agecheck" in driver.current_url.lower() or "mature_content" in driver.page_source.lower():
+                        try:
+                            # 尝试查找确认按钮
+                            buttons = driver.find_elements(By.CSS_SELECTOR, ".agegate_text_container.btns a, .agegate_btn_container .btn_blue")
+                            for button in buttons:
+                                if button.is_displayed():
+                                    print(f"尝试直接点击确认按钮: {button.text}")
+                                    driver.execute_script("arguments[0].click();", button)
+                                    time.sleep(5)
+                                    
+                                    # 检查是否成功通过验证
+                                    if "agecheck" not in driver.current_url.lower():
+                                        print("通过直接点击按钮完成年龄验证！")
+                                        
+                                        # 重新保存Cookies
+                                        cookies = driver.get_cookies()
+                                        with open(cookie_path, "wb") as f:
+                                            pickle.dump(cookies, f)
+                                        print("Cookies已更新！")
+                                        break
+                        except Exception as e:
+                            print(f"尝试方法3失败: {e}")
+                    
+                    # 检查最终结果
+                    if "agecheck" not in driver.current_url.lower():
+                        print("已成功通过年龄验证！")
                     else:
-                        print("未检测到年龄验证页面，可能已经通过验证")
+                        print("自动年龄验证失败，请手动完成验证...")
+                        input("在浏览器中手动完成年龄验证后，按Enter继续...")
+                        
+                        # 手动验证后，重新保存Cookies
+                        cookies = driver.get_cookies()
+                        with open(cookie_path, "wb") as f:
+                            pickle.dump(cookies, f)
+                        print("手动验证后Cookies已更新！")
                 except Exception as e:
                     print(f"处理年龄验证时出错: {e}")
+                    print("请尝试手动完成年龄验证...")
+                    input("在浏览器中手动完成年龄验证后，按Enter继续...")
+                    
+                    # 手动验证后，重新保存Cookies
+                    cookies = driver.get_cookies()
+                    with open(cookie_path, "wb") as f:
+                        pickle.dump(cookies, f)
+                    print("手动验证后Cookies已更新！")
             
             print("\nCookies获取完成！现在您可以使用这些Cookies爬取Steam评论，包括需要年龄验证的游戏")
             print("在爬虫启动前，cookies将自动加载")
