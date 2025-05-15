@@ -6,7 +6,7 @@ export LC_ALL=zh_CN.UTF-8
 
 # 欢迎信息
 echo "==============================================="
-echo "Steam评论获取工具启动中..."
+echo "Steam Cookies获取工具启动中..."
 echo "==============================================="
 
 # 获取脚本所在目录
@@ -45,7 +45,6 @@ fi
 
 # 确保有正确的执行权限
 chmod +x venv/bin/activate
-chmod +x venv/bin/pip3
 
 # 激活虚拟环境
 source venv/bin/activate
@@ -53,7 +52,7 @@ source venv/bin/activate
 # 检查并安装依赖
 if ! pip show selenium &> /dev/null || ! pip show webdriver-manager &> /dev/null; then
     echo "正在安装必要的依赖..."
-    pip install -r requirements.txt
+    pip install selenium webdriver-manager
     if [ $? -ne 0 ]; then
         echo "[错误] 安装依赖失败"
         read -p "按回车键退出..."
@@ -64,9 +63,9 @@ fi
 # 检查并创建必要的目录
 mkdir -p cookies output logs
 
-# 启动主程序
-echo "启动Steam爬虫工具..."
-python3 steam_cookies_launcher.py
+# 直接启动Steam Cookies Helper
+echo "正在启动Steam Cookies Helper工具..."
+python3 steam_cookies_helper.py
 
 # 如果发生错误，保持窗口打开
 if [ $? -ne 0 ]; then

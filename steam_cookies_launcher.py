@@ -104,11 +104,26 @@ def run_cookies_helper():
     
     input("按Enter键启动Cookies获取工具...")
     
-    # 运行cookies获取工具
-    if os.name == 'nt':  # Windows
-        os.system("python steam_cookies_helper.py")
-    else:  # macOS/Linux
-        os.system("python3 steam_cookies_helper.py")
+    # 直接运行cookies获取工具，不使用后台或start方式
+    try:
+        # 导入并直接执行模块
+        print("正在启动Steam Cookies工具...")
+        
+        # 方法1：直接使用importlib执行模块
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("steam_cookies_helper", "steam_cookies_helper.py")
+        cookies_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cookies_module)
+        
+    except Exception as e:
+        print(f"启动工具时出错: {e}")
+        print("尝试直接执行脚本...")
+        
+        # 方法2：使用os.system执行（不使用后台运行）
+        if os.name == 'nt':  # Windows
+            os.system("python steam_cookies_helper.py")
+        else:  # macOS/Linux
+            os.system("python3 steam_cookies_helper.py")
     
     input("\n操作完成，按Enter键返回主菜单...")
 

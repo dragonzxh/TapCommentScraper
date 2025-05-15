@@ -418,16 +418,27 @@ def test_cookies():
         print("测试完成！")
 
 if __name__ == "__main__":
-    print("Steam Cookies工具")
-    print("1. 登录并保存Cookies")
-    print("2. 测试已保存的Cookies")
-    print("3. 退出")
-    
-    choice = input("\n请选择操作 [1/2/3]: ").strip()
-    
-    if choice == "1":
-        login_and_save_cookies()
-    elif choice == "2":
-        test_cookies()
-    else:
-        print("已退出") 
+    try:
+        print("Steam Cookies工具")
+        print("1. 登录并保存Cookies")
+        print("2. 测试已保存的Cookies")
+        print("3. 退出")
+        
+        try:
+            choice = input("\n请选择操作 [1/2/3]: ").strip()
+        except EOFError:
+            print("\n错误: 无法读取输入。请尝试直接在命令行中运行 'python steam_cookies_helper.py'")
+            choice = "3"  # 默认退出
+        
+        if choice == "1":
+            login_and_save_cookies()
+        elif choice == "2":
+            test_cookies()
+        else:
+            print("已退出") 
+    except KeyboardInterrupt:
+        print("\n\n程序被用户中断，正在退出...")
+    except Exception as e:
+        print(f"\n程序遇到错误: {e}")
+        print("如果您在Windows上看到中文乱码，请以管理员身份运行cmd并执行 'chcp 65001' 后重试")
+        print("如果您在macOS上遇到问题，请尝试直接在终端中运行 'python3 steam_cookies_helper.py'") 
