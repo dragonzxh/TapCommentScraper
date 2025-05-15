@@ -10,18 +10,24 @@
 - `steam_crawler.py` - Steam游戏评论爬虫
 - `tap_crawler.py` - TapTap游戏评论爬取
 - `bili_crawler.py` - Bilibili评论爬虫
+- `steam_cookies_helper.py` - Steam Cookie获取工具
+- `steam_cookies_launcher.py` - Steam爬虫统一启动器
+
+### 启动文件
+
+- `启动Steam评论获取工具.bat` - Windows启动文件
+- `启动Steam评论获取工具.command` - macOS启动文件
+- `windows_quick_fix.bat` - Windows修复工具
 
 ### Web界面
 
 - `crawler_web/` - Web界面目录
   - `app.py` - Flask应用主文件
-  - `crawler_manager.py` - 爬虫管理器
-  - `utils.py` - 工具函数
   - `templates/` - HTML模板目录
     - `index.html` - 主页模板
+    - `comments.html` - 评论列表页模板
+    - `comment_details.html` - 评论详情页模板
   - `static/` - 静态资源目录
-    - `css/` - CSS样式文件
-    - `js/` - JavaScript文件
 - `crawler_web_start.py` - Web服务启动脚本
 
 ### 配置文件
@@ -37,8 +43,7 @@
 
 - `run_crawlers.py` - 批量运行爬虫
 - `cleanup.py` - 清理临时文件和缓存
-- `run_on_mac.sh` - Mac系统运行脚本
-- `run_on_windows.bat` - Windows系统运行脚本
+- `windows_encoding_fix.py` - 修复Windows中文编码问题
 
 ## 自动创建的目录
 
@@ -47,33 +52,22 @@
 - `output/` - 爬取结果输出目录
 - `cookies/` - Cookie存储目录
 - `logs/` - 日志文件目录
+- `venv/` - Python虚拟环境目录
 
 ## 可以安全删除的文件
 
 以下文件是旧版本、临时文件或不再需要的文件，可以安全删除：
 
-- `TapTapCrawler.spec` - PyInstaller规格文件
-- `game_errorlist.txt` - 错误游戏列表（临时文件）
-- `~$84463_comments.xlsx` - Excel临时文件
 - `.gitignore` - Git忽略文件（除非使用git管理项目）
 - `__pycache__/` - Python缓存目录
-- `Tapcomment.py` - 旧版爬虫文件（已被tap_crawler.py替代）
-- `Bilicomment.py` - 旧版爬虫文件（已被bili_crawler.py替代）
-- `requirements_web.txt` - 旧版Web依赖文件（已被requirements.txt替代）
-- `test_env/` - 测试用虚拟环境目录
+- `.DS_Store` - macOS系统文件
 
-## 数据文件
+## 文档文件
 
-这些是爬取得到的数据文件，根据需要决定是否保留：
-
-- `output/` 目录下的所有CSV、TXT和Excel文件
-- `730_comments.csv` - CS:GO评论数据文件
-- `84463_comments.xlsx` - 游戏评论Excel文件
-
-## 部署相关文件
-
-这些文件用于项目部署和打包，如果不需要可以删除：
-
-- `setup.py` - Python包安装脚本
-- `crawler_web.egg-info/` - Python包元数据
-- `webserver.py` - 独立的Web服务器脚本 
+- `README.md` - 项目说明文档
+- `USAGE.md` - 使用说明文档
+- `UPDATE_LOG.md` - 更新日志
+- `Windows中文乱码修复指南.md` - Windows编码问题修复指南
+- `WEB启动说明.md` - Web服务启动说明
+- `COMMIT_GUIDE.md` - 代码提交指南
+- `LICENSE` - 许可证文件 

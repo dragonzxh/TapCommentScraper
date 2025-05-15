@@ -19,6 +19,10 @@ import pickle
 from pathlib import Path
 import csv
 from datetime import datetime
+import importlib.util
+
+# 检查steam_cookies_helper是否存在
+has_cookies_helper = os.path.exists("steam_cookies_helper.py")
 
 class SteamCrawler(BaseCrawler):
     """Steam爬虫类，专门用于爬取Steam游戏评论"""
@@ -31,7 +35,8 @@ class SteamCrawler(BaseCrawler):
         self.load_more_text = "加载更多评测"
         self.sort_by = "评测有用程度"
         self.is_logged_in = False
-        self.cookies_file = "steam_cookies.pkl"
+        self.cookies_file = "steam_cookies.pkl"  # 默认的cookies文件名
+        self.cookies_dir = "cookies"  # cookies目录
         self.max_retries = 3  # 最大重试次数
         self.scroll_pause_time = 1  # 滚动暂停时间
         self.batch_size = 10  # 每批处理的评论数量
@@ -46,6 +51,10 @@ class SteamCrawler(BaseCrawler):
         
         # 初始化浏览器
         self.setup_driver()
+        
+        # 检查cookies路径
+        self.cookies_path = os.path.join(self.cookies_dir, self.cookies_file)
+        self.check_cookies_helper_file()
         
         # 尝试加载已保存的Cookie
         if self.load_cookies():
@@ -70,15 +79,34 @@ class SteamCrawler(BaseCrawler):
         options.add_argument('--disable-backgrounding-occluded-windows')
         options.add_argument('--disable-renderer-backgrounding')
         
-        # 设置窗口大小和位置
-        options.add_argument('--window-size=1366,768')
-        options.add_argument('--window-position=0,0')
+        # 新增：增加内存和稳定性相关选项
+        options.add_argument('--disable-web-security')
+        options.add_argument('--allow-running-insecure-content')
+        options.add_argument('--disable-popup-blocking')
+        options.add_argument('--ignore-certificate-errors')
+        options.add_argument('--window-size=1920,1080')  # 更大的窗口尺寸
         
-        # 添加必要的功能支持
-        options.add_argument('--enable-javascript')
-        options.add_argument('--enable-cookies')
-        options.add_argument('--enable-application-cache')
-        options.add_argument('--enable-dom-storage')
+        # 新增：绕过部分反爬虫机制
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        options.add_experimental_option('useAutomationExtension', False)
+        
+        # 新增：尝试显式指定Chrome路径（如果存在）
+        if os.name == 'nt':  # Windows
+            chrome_paths = [
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
+            ]
+            for path in chrome_paths:
+                expanded_path = os.path.expandvars(path)
+                if os.path.exists(expanded_path):
+                    options.binary_location = expanded_path
+                    print(f"使用Chrome路径: {expanded_path}")
+                    break
+        elif os.name == 'posix' and os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
+            options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            print("使用macOS系统Chrome路径")
         
         # 设置语言
         options.add_argument('--lang=zh-CN')
@@ -90,28 +118,85 @@ class SteamCrawler(BaseCrawler):
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         
         # 创建ChromeDriver
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=options)
+        try:
+            print("正在初始化ChromeDriver...")
+            service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=service, options=options)
+            
+            # 执行反检测JavaScript
+            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': '''
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                })
+                '''
+            })
+            
+            print("ChromeDriver初始化成功")
+        except Exception as e:
+            print(f"ChromeDriver初始化失败: {e}")
+            # 尝试使用备用方法初始化
+            try:
+                print("尝试备用方法初始化ChromeDriver...")
+                self.driver = webdriver.Chrome(options=options)
+                print("备用方法初始化成功")
+            except Exception as e2:
+                print(f"备用方法也失败: {e2}")
+                raise
         
         # 设置超时时间
-        self.driver.set_page_load_timeout(30)
-        self.driver.set_script_timeout(30)
-        self.driver.implicitly_wait(10)
-        
-        # 不再最大化窗口
-        # self.driver.maximize_window()
+        self.driver.set_page_load_timeout(60)  # 增加到60秒
+        self.driver.set_script_timeout(60)
+        self.driver.implicitly_wait(20)  # 增加到20秒
         
         print("浏览器初始化完成")
+        
+    def check_cookies_helper_file(self):
+        """检查steam_cookies_helper.py文件是否存在，提示用户"""
+        helper_file = "steam_cookies_helper.py"
+        
+        # 创建cookies目录（如果不存在）
+        Path(self.cookies_dir).mkdir(exist_ok=True)
+        
+        if os.path.exists(helper_file):
+            print(f"提示: 如果遇到年龄验证或评论加载问题，请运行 {helper_file} 获取cookies")
+            
+            # 检查cookies文件
+            if os.path.exists(self.cookies_path):
+                with open(self.cookies_path, "rb") as f:
+                    try:
+                        cookies = pickle.load(f)
+                        print(f"已找到cookies文件，包含 {len(cookies)} 个cookie")
+                    except Exception as e:
+                        print(f"cookies文件损坏: {e}")
+            else:
+                print(f"未找到cookies文件，建议运行 {helper_file} 获取Steam登录状态")
         
     def save_cookies(self):
         """保存当前的Cookie到文件"""
         try:
             cookies = self.driver.get_cookies()
-            Path("cookies").mkdir(exist_ok=True)  # 创建cookies目录
-            cookie_path = os.path.join("cookies", self.cookies_file)
-            with open(cookie_path, "wb") as f:
+            Path(self.cookies_dir).mkdir(exist_ok=True)  # 创建cookies目录
+            
+            # 保存到标准路径
+            with open(self.cookies_path, "wb") as f:
                 pickle.dump(cookies, f)
-            print("Cookie已保存")
+            print(f"已保存 {len(cookies)} 个Cookies到 {self.cookies_path}")
+            
+            # 同时保存一份人类可读的cookies信息
+            cookie_info_path = os.path.join(self.cookies_dir, "steam_cookies_info.txt")
+            with open(cookie_info_path, "w", encoding="utf-8") as f:
+                f.write(f"保存时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"总计 {len(cookies)} 个Cookies\n\n")
+                for i, cookie in enumerate(cookies, 1):
+                    f.write(f"Cookie {i}:\n")
+                    f.write(f"  名称: {cookie.get('name')}\n")
+                    f.write(f"  域: {cookie.get('domain')}\n")
+                    f.write(f"  路径: {cookie.get('path')}\n")
+                    f.write(f"  过期时间: {cookie.get('expiry', 'Session')}\n")
+                    f.write(f"  HttpOnly: {cookie.get('httpOnly', False)}\n")
+                    f.write(f"  安全: {cookie.get('secure', False)}\n\n")
+            
             return True
         except Exception as e:
             print(f"保存Cookie时出错: {e}")
@@ -120,27 +205,42 @@ class SteamCrawler(BaseCrawler):
     def load_cookies(self):
         """从文件加载Cookie"""
         try:
-            cookie_path = os.path.join("cookies", self.cookies_file)
-            if not os.path.exists(cookie_path):
+            # 检查cookies_helper创建的cookies文件
+            helper_cookies_path = os.path.join(self.cookies_dir, self.cookies_file)
+            if os.path.exists(helper_cookies_path):
+                print(f"使用 steam_cookies_helper.py 创建的cookies文件: {helper_cookies_path}")
+                with open(helper_cookies_path, "rb") as f:
+                    cookies = pickle.load(f)
+            # 使用旧的cookies文件
+            elif os.path.exists(os.path.join("cookies", self.cookies_file)):
+                cookie_path = os.path.join("cookies", self.cookies_file)
+                print(f"使用旧的cookies文件: {cookie_path}")
+                with open(cookie_path, "rb") as f:
+                    cookies = pickle.load(f)
+            else:
                 print("没有找到已保存的Cookie文件")
                 return False
-                
-            with open(cookie_path, "rb") as f:
-                cookies = pickle.load(f)
                 
             # 访问Steam网站以设置Cookie
             self.driver.get("https://store.steampowered.com")
             time.sleep(2)
             
             # 添加Cookie
+            success_count = 0
             for cookie in cookies:
                 try:
                     self.driver.add_cookie(cookie)
+                    success_count += 1
                 except Exception as e:
                     print(f"添加Cookie时出错: {e}")
                     continue
             
-            print("Cookie加载完成")
+            print(f"Cookie加载完成，成功添加 {success_count}/{len(cookies)} 个cookie")
+            
+            # 刷新页面以应用cookies
+            self.driver.refresh()
+            time.sleep(3)
+            
             return True
         except Exception as e:
             print(f"加载Cookie时出错: {e}")
@@ -481,38 +581,75 @@ class SteamCrawler(BaseCrawler):
     def handle_age_check(self):
         """处理年龄验证页面"""
         try:
-            # 检查是否存在年龄选择下拉框
-            age_selectors = [
-                "select[name='ageYear']",
-                "#ageYear",
-                "[id*='age']"
+            # 检查是否存在常见的年龄验证标记
+            age_indicators = [
+                "mature_content",
+                "agecheck",
+                "age_gate",
+                "年龄验证",
+                "age check",
+                "mature content"
             ]
             
-            for selector in age_selectors:
-                try:
-                    age_select = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    if age_select:
-                        # 选择1990年
-                        self.driver.execute_script(
-                            "arguments[0].value = '1990'",
-                            age_select
-                        )
-                        time.sleep(1)
-                        
-                        # 点击查看页面按钮
-                        view_buttons = self.driver.find_elements(
-                            By.CSS_SELECTOR,
-                            "a.btnv6_blue_hoverfade, [type='submit']"
-                        )
-                        for button in view_buttons:
-                            if "查看" in button.text or "view" in button.text.lower():
-                                button.click()
-                                time.sleep(3)
-                                return True
-                except:
-                    continue
+            page_source_lower = self.driver.page_source.lower()
+            age_verification_needed = any(indicator in page_source_lower for indicator in age_indicators)
             
-            return False
+            if age_verification_needed:
+                print("检测到年龄验证页面，尝试处理...")
+                
+                # 方法1：尝试查找年龄选择下拉框
+                age_selects = self.driver.find_elements(By.CSS_SELECTOR, "select[name='ageYear'], #ageYear, [id*='age']")
+                if age_selects:
+                    for age_select in age_selects:
+                        if age_select.is_displayed():
+                            # 选择1990年
+                            self.driver.execute_script(
+                                "arguments[0].value = '1990'",
+                                age_select
+                            )
+                            print("已设置年龄为1990年")
+                            time.sleep(1)
+                            
+                            # 点击查看页面按钮
+                            view_buttons = self.driver.find_elements(
+                                By.CSS_SELECTOR,
+                                "a.btnv6_blue_hoverfade, [type='submit'], .agegate_text_container.btns a"
+                            )
+                            for button in view_buttons:
+                                button_text = button.text.lower()
+                                if ("view" in button_text or 
+                                    "enter" in button_text or 
+                                    "proceed" in button_text or
+                                    "continue" in button_text or
+                                    "查看" in button_text or
+                                    "进入" in button_text):
+                                    print(f"点击按钮: {button.text}")
+                                    self.driver.execute_script("arguments[0].click();", button)
+                                    time.sleep(5)
+                                    return True
+                
+                # 方法2：直接尝试点击可能的确认按钮
+                view_buttons = self.driver.find_elements(
+                    By.CSS_SELECTOR,
+                    "a.btnv6_blue_hoverfade, .agegate_text_container.btns a, .agegate_btn_container .btn_blue"
+                )
+                for button in view_buttons:
+                    button_text = button.text.lower()
+                    if ("view" in button_text or 
+                        "enter" in button_text or 
+                        "proceed" in button_text or
+                        "continue" in button_text or
+                        "查看" in button_text or
+                        "进入" in button_text):
+                        print(f"直接点击按钮: {button.text}")
+                        self.driver.execute_script("arguments[0].click();", button)
+                        time.sleep(5)
+                        return True
+                
+                print("尝试处理年龄验证失败，可能需要使用steam_cookies_helper.py工具获取登录状态")
+                return False
+            
+            return False  # 没有检测到年龄验证页面
         except Exception as e:
             print(f"处理年龄验证时出错: {e}")
             return False
@@ -602,6 +739,8 @@ class SteamCrawler(BaseCrawler):
             # 检查是否已登录
             if not self.is_logged_in:
                 print("警告: 未登录状态下可能无法获取完整评论")
+            else:
+                print("已检测到登录状态，将能够访问更多内容")
 
             # 标准化URL
             if not url.endswith("/"):
@@ -631,16 +770,46 @@ class SteamCrawler(BaseCrawler):
             print(f"\n开始访问URL: {review_url}")
             self.driver.get(review_url)
             
-            # 等待页面加载
-            time.sleep(2)
+            # 增加等待页面加载的时间
+            time.sleep(10)  # 从原来的2秒增加到10秒
             
-            # 确保评论已加载
+            # 处理可能出现的年龄验证页面
+            if self.handle_age_check():
+                print("成功处理年龄验证页面")
+            
+            # 确保评论已加载，增加超时时间
             try:
-                WebDriverWait(self.driver, 10).until(
+                print("等待评论元素加载...")
+                WebDriverWait(self.driver, 30).until(  # 增加到30秒
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".apphub_Card"))
                 )
-            except Exception:
-                print("超时: 评论未能加载")
+            except Exception as e:
+                print(f"评论未能加载: {e}")
+                
+                # 保存页面源码以便分析
+                try:
+                    error_log_path = f"error_log_page_{app_id}.html"
+                    with open(error_log_path, "w", encoding="utf-8") as f:
+                        f.write(self.driver.page_source)
+                    print(f"已保存页面源码到 {error_log_path} 以便分析问题")
+                    
+                    # 检查是否包含特定的错误信息
+                    if "mature_content" in self.driver.page_source or "age_gate" in self.driver.page_source or "agecheck" in self.driver.page_source:
+                        print("\n错误原因：页面需要年龄验证。请使用以下方法解决：")
+                        print("1. 运行 python steam_cookies_helper.py")
+                        print("2. 选择选项1：登录并保存Cookies")
+                        print("3. 在打开的浏览器中登录您的Steam账号")
+                        print("4. 完成年龄验证步骤")
+                        print("5. 重新运行本爬虫")
+                    elif "not available in your country" in self.driver.page_source.lower():
+                        print("错误原因：该游戏在您的地区不可用")
+                    elif "please select a language" in self.driver.page_source.lower():
+                        print("错误原因：需要选择语言")
+                    else:
+                        print("未知错误，请检查错误日志页面")
+                except Exception as save_e:
+                    print(f"保存错误页面源码失败: {save_e}")
+                
                 return []
             
             # 获取初始评论数量
@@ -910,10 +1079,57 @@ if __name__ == "__main__":
         use_headless = input("是否使用无头模式运行浏览器(无界面，推荐用于解决闪退问题)? [y/n]: ").strip().lower() == 'y'
         crawler = SteamCrawler(use_headless)
         
-        # 直接使用文明7的评论页面URL
-        url = "https://steamcommunity.com/app/1295660/reviews/?browsefilter=toprated&snr=1_5_100010_&filterLanguage=schinese"
-        print(f"\n开始爬取文明7评论，URL: {url}")
-        crawler.extract_comments(url)
+        # 检查是否有专用的cookies辅助工具
+        if os.path.exists("steam_cookies_helper.py"):
+            use_helper = input("\n检测到steam_cookies_helper.py工具。是否先获取Steam cookies (推荐，解决年龄验证问题)? [y/n]: ").strip().lower() == 'y'
+            if use_helper:
+                print("\n请在新窗口中操作steam_cookies_helper.py工具...")
+                if os.name == 'nt':  # Windows
+                    os.system("start python steam_cookies_helper.py")
+                else:  # macOS/Linux
+                    os.system("python steam_cookies_helper.py &")
+                input("\n在完成cookies获取后，按Enter继续爬虫操作...")
+                # 重新加载cookies
+                crawler = SteamCrawler(use_headless)
+        
+        # 添加登录选项
+        need_login = input("\n是否需要登录Steam账号(推荐，可以解决年龄验证问题)? [y/n]: ").strip().lower() == 'y'
+        if need_login:
+            username = input("请输入Steam用户名: ")
+            import getpass
+            password = getpass.getpass("请输入Steam密码(输入时不会显示): ")
+            login_success = crawler.login(username, password)
+            if login_success:
+                print("登录成功！已保存Cookie以便后续使用")
+            else:
+                print("登录失败，将以未登录状态继续")
+        
+        # 获取输入的URL
+        url_input = input("\n请输入Steam游戏评论页面或商店页面URL(或直接输入游戏ID): ").strip()
+        
+        # 检查是否直接输入ID
+        if url_input.isdigit():
+            url = f"https://steamcommunity.com/app/{url_input}/reviews/?browsefilter=toprated&filterLanguage=schinese"
+            print(f"已将游戏ID转换为URL: {url}")
+        else:
+            url = url_input
+        
+        # 创建输出目录
+        if not os.path.exists("output"):
+            os.makedirs("output")
+            print("已创建output目录用于保存结果")
+        
+        print(f"\n开始爬取Steam评论，URL: {url}")
+        comments = crawler.extract_comments(url)
+        
+        if not comments or len(comments) == 0:
+            print("\n未能获取评论，可能原因：")
+            print("1. 该游戏需要通过年龄验证")
+            print("2. 该游戏可能没有评论或评论不可见")
+            print("3. 网络连接问题或Steam服务器限制")
+            print("\n解决方案：")
+            print("1. 运行 python steam_cookies_helper.py 获取登录状态")
+            print("2. 使用非无头模式，观察浏览器加载过程以诊断问题")
         
     except Exception as e:
         print(f"程序运行时发生未处理的异常: {e}")
@@ -921,6 +1137,12 @@ if __name__ == "__main__":
         try:
             with open("error_log.txt", "a", encoding='utf-8') as f:
                 f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 未处理的异常: {str(e)}\n")
+                
+            # 导入traceback以获取完整堆栈信息
+            import traceback
+            with open("error_log.txt", "a", encoding='utf-8') as f:
+                f.write(traceback.format_exc())
+                f.write("\n\n")
         except:
             pass
     finally:
