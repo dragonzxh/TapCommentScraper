@@ -27,16 +27,23 @@ def setup_driver(use_headless=True):
     
     if use_headless:
         options.add_argument('--headless=new')
+    else:
+        # 在非headless模式下，设置窗口大小和位置
+        options.add_argument('--window-size=1280,800')
+        options.add_argument('--window-position=100,50')
+        # 禁用扩展以提高稳定性
+        options.add_argument('--disable-extensions')
+        # 确保显示浏览器窗口
+        options.add_experimental_option("detach", True)
+        options.add_experimental_option("excludeSwitches", ['enable-automation', 'enable-logging'])
     
     # 基本设置
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1920,1080')
     
     # 绕过反爬虫
     options.add_argument('--disable-blink-features=AutomationControlled')
-    options.add_experimental_option('excludeSwitches', ['enable-automation'])
     options.add_experimental_option('useAutomationExtension', False)
     
     # 设置用户代理
@@ -44,7 +51,8 @@ def setup_driver(use_headless=True):
     
     try:
         print("正在初始化Chrome浏览器...")
-        service = Service(ChromeDriverManager().install())
+        # 确保使用最新版本的ChromeDriver
+        service = Service(ChromeDriverManager(cache_valid_range=1).install())
         driver = webdriver.Chrome(service=service, options=options)
         
         # 执行反检测JavaScript
@@ -56,19 +64,28 @@ def setup_driver(use_headless=True):
             '''
         })
         
+        # 设置超时时间
         driver.set_page_load_timeout(60)
         driver.set_script_timeout(60)
         driver.implicitly_wait(20)
+        
+        # 非headless模式下，最大化窗口
+        if not use_headless:
+            driver.maximize_window()
+            print("已打开Chrome浏览器窗口")
         
         return driver
     except Exception as e:
         print(f"浏览器初始化失败: {e}")
         try:
             print("尝试备用方法...")
+            if not use_headless:
+                print("确保已安装Chrome浏览器并且版本与ChromeDriver兼容")
             driver = webdriver.Chrome(options=options)
             return driver
         except Exception as e2:
             print(f"备用方法也失败: {e2}")
+            print("请确保已安装Chrome浏览器，并且系统环境允许显示GUI窗口")
             sys.exit(1)
 
 def load_cookies(driver):
@@ -161,118 +178,10 @@ def check_login_status(driver):
         return False
 
 def handle_age_verification(driver):
-    """自动处理多个需要年龄验证的游戏"""
-    # 需要年龄验证的游戏列表
-    age_restricted_games = [
-        {"name": "GTA5", "url": "https://store.steampowered.com/app/271590/Grand_Theft_Auto_V/"},
-        {"name": "赛博朋克2077", "url": "https://store.steampowered.com/app/1091500/Cyberpunk_2077/"},
-        {"name": "巫师3", "url": "https://store.steampowered.com/app/292030/The_Witcher_3_Wild_Hunt/"},
-        {"name": "只狼", "url": "https://store.steampowered.com/app/814380/Sekiro_Shadows_Die_Twice__GOTY_Edition/"},
-        {"name": "鬼泣5", "url": "https://store.steampowered.com/app/601150/Devil_May_Cry_5/"}
-    ]
-    
-    for game in age_restricted_games:
-        try:
-            print(f"\n正在处理游戏 {game['name']} 的年龄验证...")
-            driver.get(game["url"])
-            time.sleep(3)
-            
-            # 检查是否需要年龄验证
-            age_indicators = ["mature_content", "agecheck", "age_gate", "年龄验证"]
-            page_source_lower = driver.page_source.lower()
-            
-            if any(indicator in page_source_lower for indicator in age_indicators):
-                print(f"检测到 {game['name']} 需要年龄验证，尝试处理...")
-                
-                # 方法1：最新版Steam的三选择框验证
-                try:
-                    day_select = driver.find_element(By.ID, "ageDay")
-                    month_select = driver.find_element(By.ID, "ageMonth")
-                    year_select = driver.find_element(By.ID, "ageYear")
-                    
-                    driver.execute_script("arguments[0].value = '1';", day_select)
-                    driver.execute_script("arguments[0].value = 'January';", month_select)
-                    driver.execute_script("arguments[0].value = '1990';", year_select)
-                    
-                    submit_button = driver.find_element(By.CSS_SELECTOR, ".btnv6_blue_hoverfade")
-                    driver.execute_script("arguments[0].click();", submit_button)
-                    time.sleep(5)
-                    
-                    # 验证是否成功
-                    if "agecheck" not in driver.current_url.lower():
-                        print(f"{game['name']} 年龄验证成功！")
-                        save_cookies(driver)  # 保存更新的Cookies
-                except Exception as e:
-                    print(f"方法1失败: {e}")
-                
-                # 方法2：旧版Steam的年份选择
-                if "agecheck" in driver.current_url.lower() or any(indicator in driver.page_source.lower() for indicator in age_indicators):
-                    try:
-                        age_selects = driver.find_elements(By.CSS_SELECTOR, "select[name='ageYear']")
-                        if age_selects:
-                            for age_select in age_selects:
-                                if age_select.is_displayed():
-                                    driver.execute_script("arguments[0].value = '1990'", age_select)
-                                    
-                                    view_buttons = driver.find_elements(By.CSS_SELECTOR, "a.btnv6_blue_hoverfade, [type='submit']")
-                                    for button in view_buttons:
-                                        if button.is_displayed():
-                                            driver.execute_script("arguments[0].click();", button)
-                                            time.sleep(5)
-                                            
-                                            # 验证是否成功
-                                            if "agecheck" not in driver.current_url.lower():
-                                                print(f"{game['name']} 年龄验证成功！")
-                                                save_cookies(driver)  # 保存更新的Cookies
-                                                break
-                    except Exception as e:
-                        print(f"方法2失败: {e}")
-                
-                # 方法3：简化的按钮点击验证
-                if "agecheck" in driver.current_url.lower() or any(indicator in driver.page_source.lower() for indicator in age_indicators):
-                    try:
-                        buttons = driver.find_elements(By.CSS_SELECTOR, ".agegate_text_container.btns a, .agegate_btn_container .btn_blue")
-                        for button in buttons:
-                            if button.is_displayed():
-                                driver.execute_script("arguments[0].click();", button)
-                                time.sleep(5)
-                                
-                                # 验证是否成功
-                                if "agecheck" not in driver.current_url.lower():
-                                    print(f"{game['name']} 年龄验证成功！")
-                                    save_cookies(driver)  # 保存更新的Cookies
-                                    break
-                    except Exception as e:
-                        print(f"方法3失败: {e}")
-                
-                # 方法4：URL参数绕过
-                if "agecheck" in driver.current_url.lower() or any(indicator in driver.page_source.lower() for indicator in age_indicators):
-                    try:
-                        current_url = driver.current_url
-                        if "?mature_content=1" not in current_url and "&mature_content=1" not in current_url:
-                            if "?" in current_url:
-                                new_url = current_url + "&mature_content=1"
-                            else:
-                                new_url = current_url + "?mature_content=1"
-                            
-                            driver.get(new_url)
-                            time.sleep(5)
-                            
-                            # 验证是否成功
-                            if not any(indicator in driver.page_source.lower() for indicator in age_indicators):
-                                print(f"{game['name']} 使用URL参数绕过年龄验证成功！")
-                                save_cookies(driver)  # 保存更新的Cookies
-                    except Exception as e:
-                        print(f"方法4失败: {e}")
-            else:
-                print(f"{game['name']} 不需要年龄验证，继续处理下一个游戏")
-        
-        except Exception as e:
-            print(f"处理 {game['name']} 时出错: {e}")
-    
-    # 重新保存最终的Cookies
+    """自动处理年龄验证 - 此版本不再处理固定的游戏列表"""
+    # 仅保存当前的Cookies
     save_cookies(driver)
-    print("\n已完成所有游戏的年龄验证处理")
+    print("\n已保存当前的Cookies，Web服务会使用这些Cookies进行验证")
 
 def start_web_server():
     """启动Web服务器并打开浏览器"""
@@ -316,21 +225,24 @@ def main():
     """主函数"""
     try:
         print("=" * 60)
-        print("自动处理年龄验证并启动Web服务工具")
+        print("自动启动Web服务工具")
         print("=" * 60)
         print("此工具将自动完成以下操作:")
         print("1. 加载Steam Cookies并验证登录状态")
-        print("2. 自动处理多个游戏的年龄验证")
-        print("3. 保存更新后的Cookies")
-        print("4. 启动Web服务器并打开浏览器")
+        print("2. 保存Cookies供Web服务器使用")
+        print("3. 启动Web服务器并打开浏览器")
         print("=" * 60)
         
         # 创建必要的目录
         for directory in ["cookies", "output", "logs"]:
             Path(directory).mkdir(exist_ok=True)
         
+        # 确认是否使用无头模式
+        use_headless = False  # 强制使用有头模式
+        print(f"将使用{'无头' if use_headless else '有界面'}模式打开浏览器")
+        
         # 启动浏览器
-        driver = setup_driver(use_headless=False)  # 使用有界面模式方便查看进度
+        driver = setup_driver(use_headless=use_headless)
         
         # 加载Cookies并检查登录状态
         cookies_loaded = load_cookies(driver)
@@ -341,7 +253,9 @@ def main():
             print("正在打开Steam登录页面...")
             driver.get("https://store.steampowered.com/login/")
             
-            input("\n请在浏览器中完成登录，然后按Enter继续...")
+            # 等待用户登录
+            print("\n请在浏览器中完成登录，然后按Enter继续...")
+            input("(如果没有看到浏览器窗口，请检查任务栏或其他桌面空间)")
             
             # 重新检查登录状态
             is_logged_in = check_login_status(driver)
@@ -353,10 +267,11 @@ def main():
                 driver.quit()
                 return
         
-        # 处理年龄验证
+        # 保存cookies
         handle_age_verification(driver)
         
         # 关闭浏览器
+        print("处理完成，正在关闭浏览器...")
         driver.quit()
         print("浏览器已关闭")
         
@@ -365,6 +280,7 @@ def main():
         
         # 保持程序运行直到用户中断
         try:
+            print("\n程序将保持运行状态。要退出请按Ctrl+C")
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:

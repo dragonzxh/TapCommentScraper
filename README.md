@@ -141,3 +141,107 @@ MIT License
 ## 贡献
 
 欢迎提交Issue和Pull Request来帮助改进项目！
+
+# Steam 评论爬虫
+
+Steam评论爬虫是一个基于Selenium的自动化工具，用于爬取Steam游戏评论数据。
+
+## 特性
+
+- 支持Steam游戏评论爬取
+- 自动处理Steam登录和Cookie管理
+- 自动处理年龄验证页面
+- 支持评论分页爬取
+- 支持评论回复爬取
+- 保存评论数据为JSON格式
+
+## 目录结构
+
+```
+.
+├── cookies/                  # 存储Cookie相关文件
+├── output/                   # 爬取结果输出目录
+├── steam_config.py           # 配置文件
+├── steam_driver.py           # WebDriver管理模块
+├── steam_cookies.py          # Cookie管理模块
+├── steam_crawler.py          # 爬虫主模块
+├── run_crawlers.py           # 统一爬虫运行入口
+└── README.md                 # 项目说明
+```
+
+## 安装要求
+
+- Python 3.7+
+- Selenium
+- webdriver-manager
+- Chrome浏览器
+
+安装依赖：
+
+```bash
+pip install -r requirements.txt
+```
+
+## 使用方法
+
+### 1. 获取Steam登录Cookie
+
+首次使用时，需要获取Steam登录Cookie：
+
+```bash
+python steam_cookies.py
+```
+
+这会启动一个浏览器窗口，您需要手动登录Steam账号。登录成功后，程序会自动保存Cookie。
+
+### 2. 运行爬虫
+
+通过统一爬虫运行入口启动Steam爬虫：
+
+```bash
+# 爬取指定游戏页面的评论
+python run_crawlers.py steam --url "https://store.steampowered.com/app/570/Dota_2/"
+
+# 使用无头模式运行
+python run_crawlers.py steam --url "https://store.steampowered.com/app/570/Dota_2/" --headless
+
+# 限制爬取评论数量
+python run_crawlers.py steam --url "https://store.steampowered.com/app/570/Dota_2/" --max-reviews 100
+```
+
+也可以直接运行爬虫模块：
+
+```bash
+python steam_crawler.py --url "https://store.steampowered.com/app/570/Dota_2/"
+```
+
+### 3. 查看结果
+
+爬取结果将保存在 `output/` 目录下，按照游戏ID分类存储，每条评论保存为一个独立的JSON文件。
+
+## 常见问题
+
+1. **无法登录Steam**
+   - 请确保您的网络环境可以正常访问Steam
+   - 可能需要处理验证码或二步验证
+   - 尝试手动获取Cookie并保存
+
+2. **爬虫被封禁**
+   - 减慢爬取速度（修改配置文件中的延迟参数）
+   - 使用代理IP
+   - 避免短时间内大量爬取
+
+## 配置说明
+
+您可以在 `steam_config.py` 文件中修改以下配置：
+
+- COOKIES_DIR: Cookie存储目录
+- OUTPUT_DIR: 输出目录
+- PAGE_LOAD_TIMEOUT: 页面加载超时时间
+- SCROLL_PAUSE_TIME: 滚动间隔时间
+- BATCH_SIZE: 每批处理的评论数
+- SCRAPE_COMMENTS: 是否爬取评论回复
+
+## 许可证
+
+使用本爬虫工具请遵守Steam网站的使用条款。本工具仅供学习和研究使用。

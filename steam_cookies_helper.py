@@ -8,12 +8,11 @@ Steam Cookies 获取和管理工具
 
 import os
 import pickle
+import json
 import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from pathlib import Path
 
@@ -38,21 +37,8 @@ def setup_driver(use_headless=False):
     # 设置用户代理
     options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
-    # 尝试显式指定Chrome路径
-    import os
-    if os.name == 'nt':  # Windows
-        chrome_paths = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
-        ]
-        for path in chrome_paths:
-            expanded_path = os.path.expandvars(path)
-            if os.path.exists(expanded_path):
-                options.binary_location = expanded_path
-                print(f"使用Chrome路径: {expanded_path}")
-                break
-    elif os.name == 'posix' and os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
+    # 为macOS找到正确的Chrome路径
+    if os.name == 'posix' and os.path.exists("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
         options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         print("使用macOS系统Chrome路径")
     
@@ -60,16 +46,6 @@ def setup_driver(use_headless=False):
         print("正在初始化ChromeDriver...")
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
-        
-        # 执行反检测JavaScript
-        driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-            'source': '''
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            })
-            '''
-        })
-        
         print("ChromeDriver初始化成功")
         
         # 设置超时时间
@@ -122,8 +98,7 @@ def login_and_save_cookies():
             "#account_pulldown",
             ".playerAvatar",
             ".user_avatar",
-            "#account_dropdown",
-            ".supernav_container"
+            "#account_dropdown"
         ]
         
         login_success = False
@@ -134,14 +109,50 @@ def login_and_save_cookies():
                 break
         
         if login_success:
-            print("登录成功！")
+            print("登录成功！正在访问主要Steam站点初始化会话...")
             
-            # 保存Cookies
+            # 访问主要Steam域名来初始化会话
+            domains = [
+                "https://store.steampowered.com/",
+                "https://steamcommunity.com/",
+                "https://steamcommunity.com/my/"  # 访问个人资料页面以完全激活会话
+            ]
+            
+            for domain in domains:
+                try:
+                    print(f"访问 {domain}...")
+                    driver.get(domain)
+                    time.sleep(3)  # 等待页面加载和会话处理
+                except Exception as e:
+                    print(f"访问 {domain} 时出错: {e}")
+            
+            # 保存Cookies - 使用两种格式
             cookies = driver.get_cookies()
+            
+            # 检查是否包含关键的steamLoginSecure cookie
+            has_login_secure = False
+            for cookie in cookies:
+                if cookie.get('name') == 'steamLoginSecure':
+                    has_login_secure = True
+                    print(f"√ 成功获取steamLoginSecure cookie (domain: {cookie.get('domain')})")
+                    break
+            
+            if not has_login_secure:
+                print("⚠️ 警告: 未获取到steamLoginSecure cookie，登录可能无效")
+                print("请重新尝试登录过程")
+                return False
+            
+            # 1. Pickle格式 (二进制)
             cookie_path = os.path.join("cookies", "steam_cookies.pkl")
             with open(cookie_path, "wb") as f:
                 pickle.dump(cookies, f)
             print(f"Cookies已保存到: {cookie_path}")
+            
+            # 2. JSON格式 (文本格式，便于查看和编辑)
+            json_path = os.path.join("cookies", "steam_cookies.json")
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(cookies, f)
+            print(f"Cookies已保存为JSON格式: {json_path}")
             
             # 保存人类可读的Cookies信息
             cookie_info_path = os.path.join("cookies", "steam_cookies_info.txt")
@@ -161,147 +172,23 @@ def login_and_save_cookies():
             # 访问年龄验证游戏
             verify_age = input("\n是否访问年龄验证游戏以通过年龄验证？ [y/n]: ").strip().lower() == 'y'
             if verify_age:
-                print("\n选择要访问的年龄验证游戏：")
-                print("1. GTA5 (美国游戏)")
-                print("2. 赛博朋克2077 (波兰游戏)")
-                print("3. 巫师3 (波兰游戏)")
-                print("4. 只狼：影逝二度 (日本游戏)")
-                print("5. 鬼泣5 (日本游戏)")
-                
-                game_choice = input("请选择 [1-5，默认1]: ").strip()
-                
-                # 根据选择设置游戏URL
-                game_urls = {
-                    "1": "https://store.steampowered.com/app/271590/Grand_Theft_Auto_V/",  # GTA5
-                    "2": "https://store.steampowered.com/app/1091500/Cyberpunk_2077/",     # 赛博朋克2077
-                    "3": "https://store.steampowered.com/app/292030/The_Witcher_3_Wild_Hunt/", # 巫师3
-                    "4": "https://store.steampowered.com/app/814380/Sekiro_Shadows_Die_Twice__GOTY_Edition/", # 只狼
-                    "5": "https://store.steampowered.com/app/601150/Devil_May_Cry_5/"      # 鬼泣5
-                }
-                
-                game_url = game_urls.get(game_choice, game_urls["1"])
-                game_name = {
-                    "1": "GTA5",
-                    "2": "赛博朋克2077",
-                    "3": "巫师3",
-                    "4": "只狼：影逝二度",
-                    "5": "鬼泣5"
-                }.get(game_choice, "GTA5")
-                
-                print(f"\n正在访问 {game_name} 游戏页面进行年龄验证...")
-                driver.get(game_url)
+                print("\n正在访问GTA5页面进行年龄验证...")
+                driver.get("https://store.steampowered.com/app/271590/Grand_Theft_Auto_V/")
                 time.sleep(3)
                 
-                # 尝试通过年龄验证
-                try:
-                    # 方法1：最新版的Steam年龄验证 - 日期选择器
-                    try:
-                        # 尝试找到日期选择器并设置
-                        day_select = driver.find_element(By.ID, "ageDay")
-                        month_select = driver.find_element(By.ID, "ageMonth")
-                        year_select = driver.find_element(By.ID, "ageYear")
-                        
-                        # 使用JavaScript设置日期为1990年1月1日
-                        driver.execute_script("arguments[0].value = '1';", day_select)
-                        driver.execute_script("arguments[0].value = 'January';", month_select)
-                        driver.execute_script("arguments[0].value = '1990';", year_select)
-                        
-                        print("已设置出生日期为1990年1月1日")
-                        time.sleep(1)
-                        
-                        # 点击查看页面按钮
-                        submit_button = driver.find_element(By.CSS_SELECTOR, ".btnv6_blue_hoverfade")
-                        driver.execute_script("arguments[0].click();", submit_button)
-                        print("已点击提交按钮")
-                        time.sleep(5)
-                        
-                        # 检查是否成功通过验证
-                        if "agecheck" not in driver.current_url.lower():
-                            print("年龄验证完成！")
-                            
-                            # 重新保存Cookies
-                            cookies = driver.get_cookies()
-                            with open(cookie_path, "wb") as f:
-                                pickle.dump(cookies, f)
-                            print("Cookies已更新！")
-                    except Exception as e:
-                        print(f"尝试方法1失败: {e}")
-                    
-                    # 方法2：旧版Steam年龄验证 - 年份下拉框
-                    if "agecheck" in driver.current_url.lower() or "mature_content" in driver.page_source.lower():
-                        try:
-                            # 尝试查找年龄选择下拉框
-                            age_selects = driver.find_elements(By.CSS_SELECTOR, "select[name='ageYear']")
-                            if age_selects:
-                                print("检测到旧版年龄验证页面，尝试选择年龄...")
-                                driver.execute_script("document.querySelector('select[name=\"ageYear\"]').value = '1990'")
-                                view_buttons = driver.find_elements(By.CSS_SELECTOR, "a.btnv6_blue_hoverfade, [type='submit']")
-                                for button in view_buttons:
-                                    if ("view" in button.text.lower() or 
-                                        "enter" in button.text.lower() or 
-                                        "continue" in button.text.lower() or
-                                        "查看" in button.text.lower()):
-                                        driver.execute_script("arguments[0].click();", button)
-                                        time.sleep(5)  # 等待页面加载
-                                        
-                                        # 检查是否成功通过验证
-                                        if "agecheck" not in driver.current_url.lower():
-                                            print("年龄验证完成！")
-                                            
-                                            # 重新保存Cookies
-                                            cookies = driver.get_cookies()
-                                            with open(cookie_path, "wb") as f:
-                                                pickle.dump(cookies, f)
-                                            print("Cookies已更新！")
-                                            break
-                        except Exception as e:
-                            print(f"尝试方法2失败: {e}")
-                    
-                    # 方法3：直接点击确认按钮
-                    if "agecheck" in driver.current_url.lower() or "mature_content" in driver.page_source.lower():
-                        try:
-                            # 尝试查找确认按钮
-                            buttons = driver.find_elements(By.CSS_SELECTOR, ".agegate_text_container.btns a, .agegate_btn_container .btn_blue")
-                            for button in buttons:
-                                if button.is_displayed():
-                                    print(f"尝试直接点击确认按钮: {button.text}")
-                                    driver.execute_script("arguments[0].click();", button)
-                                    time.sleep(5)
-                                    
-                                    # 检查是否成功通过验证
-                                    if "agecheck" not in driver.current_url.lower():
-                                        print("通过直接点击按钮完成年龄验证！")
-                                        
-                                        # 重新保存Cookies
-                                        cookies = driver.get_cookies()
-                                        with open(cookie_path, "wb") as f:
-                                            pickle.dump(cookies, f)
-                                        print("Cookies已更新！")
-                                        break
-                        except Exception as e:
-                            print(f"尝试方法3失败: {e}")
-                    
-                    # 检查最终结果
-                    if "agecheck" not in driver.current_url.lower():
-                        print("已成功通过年龄验证！")
-                    else:
-                        print("自动年龄验证失败，请手动完成验证...")
-                        input("在浏览器中手动完成年龄验证后，按Enter继续...")
-                        
-                        # 手动验证后，重新保存Cookies
-                        cookies = driver.get_cookies()
-                        with open(cookie_path, "wb") as f:
-                            pickle.dump(cookies, f)
-                        print("手动验证后Cookies已更新！")
-                except Exception as e:
-                    print(f"处理年龄验证时出错: {e}")
-                    print("请尝试手动完成年龄验证...")
+                # 检查最终结果
+                if "agecheck" not in driver.current_url.lower():
+                    print("已成功通过年龄验证！")
+                else:
+                    print("需要手动完成验证...")
                     input("在浏览器中手动完成年龄验证后，按Enter继续...")
                     
                     # 手动验证后，重新保存Cookies
                     cookies = driver.get_cookies()
                     with open(cookie_path, "wb") as f:
                         pickle.dump(cookies, f)
+                    with open(json_path, "w", encoding="utf-8") as f:
+                        json.dump(cookies, f)
                     print("手动验证后Cookies已更新！")
             
             print("\nCookies获取完成！现在您可以使用这些Cookies爬取Steam评论，包括需要年龄验证的游戏")
@@ -348,9 +235,35 @@ def test_cookies():
         with open(cookie_path, "rb") as f:
             cookies = pickle.load(f)
         
+        # 检查是否存在steamLoginSecure cookie
+        has_login_secure = False
+        for cookie in cookies:
+            if cookie.get('name') == 'steamLoginSecure':
+                has_login_secure = True
+                print(f"√ 检测到steamLoginSecure cookie (domain: {cookie.get('domain')})")
+                break
+        
+        if not has_login_secure:
+            print("⚠️ 警告: 未检测到steamLoginSecure cookie，可能无法正常登录")
+            print("建议重新运行login_and_save_cookies()获取cookies")
+            driver.quit()
+            return
+        
         for cookie in cookies:
             try:
-                driver.add_cookie(cookie)
+                # 尝试使用简化的cookie添加方式
+                simplified_cookie = {
+                    'name': cookie.get('name'),
+                    'value': cookie.get('value')
+                }
+                
+                # 对于关键cookie，确保domain是正确的
+                if cookie.get('name') in ['steamLoginSecure', 'sessionid'] and 'domain' in cookie:
+                    domain = cookie.get('domain')
+                    if 'steam' in domain:
+                        simplified_cookie['domain'] = domain
+                
+                driver.add_cookie(simplified_cookie)
             except Exception as e:
                 print(f"添加Cookie时出错，但将继续: {e}")
         
@@ -359,54 +272,41 @@ def test_cookies():
         driver.refresh()
         time.sleep(3)
         
-        # 检查是否登录
+        # 检查是否登录 - 寻找账户菜单
         account_indicators = [
             "#account_pulldown",
             ".playerAvatar",
             ".user_avatar",
-            "#account_dropdown",
-            ".supernav_container"
+            "#account_dropdown"
         ]
         
         login_success = False
         for indicator in account_indicators:
             elements = driver.find_elements(By.CSS_SELECTOR, indicator)
-            if elements:
+            if elements and len(elements) > 0 and elements[0].is_displayed():
                 login_success = True
+                print(f"✓ 找到登录状态指示器: {indicator}")
                 break
         
         if login_success:
-            print("Cookies验证成功！您已登录")
+            print("✅ Cookies验证成功！您已登录")
             
-            # 输入游戏ID进行测试
-            game_id = input("\n请输入要测试的游戏ID（例如，3014080）: ").strip()
-            
-            # 访问游戏评论页面
-            review_url = f"https://steamcommunity.com/app/{game_id}/reviews/?browsefilter=toprated&filterLanguage=schinese"
-            print(f"\n正在访问游戏评论页面: {review_url}")
-            driver.get(review_url)
-            time.sleep(5)
-            
-            # 检查是否能够访问评论
-            reviews = driver.find_elements(By.CSS_SELECTOR, ".apphub_Card")
-            if reviews:
-                print(f"成功加载评论！找到 {len(reviews)} 条评论")
-                print("Cookies有效，可以正常爬取此游戏的评论")
-            else:
-                print("未找到评论元素，可能需要额外处理")
+            # 尝试访问用户资料页面确认登录状态
+            try:
+                print("\n尝试访问用户资料页面...")
+                driver.get("https://steamcommunity.com/my/")
+                time.sleep(3)
                 
-                # 检查是否需要年龄验证
-                if "mature_content" in driver.page_source or "agecheck" in driver.page_source:
-                    print("检测到年龄验证页面，您可能需要先手动通过年龄验证，或使用login_and_save_cookies()中的年龄验证功能")
+                if "login" not in driver.current_url.lower():
+                    print("✅ 成功访问用户资料页面，确认登录有效")
                 else:
-                    print("未检测到年龄验证页面，可能是评论加载失败或其他问题")
-                    # 保存页面源码以供分析
-                    error_log_path = f"error_log_page_{game_id}.html"
-                    with open(error_log_path, "w", encoding="utf-8") as f:
-                        f.write(driver.page_source)
-                    print(f"已保存页面源码到 {error_log_path} 以便分析问题")
+                    print("❌ 无法访问用户资料页面，登录可能部分有效")
+            except Exception as e:
+                print(f"访问用户资料页面时出错: {e}")
+            
+            print("\nCookies测试完成！可以用于爬取Steam评论")
         else:
-            print("Cookies验证失败，未检测到登录状态")
+            print("❌ Cookies验证失败，未检测到登录状态")
             print("这可能意味着Cookies已过期或无效")
             print("建议重新运行login_and_save_cookies()函数获取最新Cookies")
     
@@ -424,11 +324,7 @@ if __name__ == "__main__":
         print("2. 测试已保存的Cookies")
         print("3. 退出")
         
-        try:
-            choice = input("\n请选择操作 [1/2/3]: ").strip()
-        except EOFError:
-            print("\n错误: 无法读取输入。请尝试直接在命令行中运行 'python steam_cookies_helper.py'")
-            choice = "3"  # 默认退出
+        choice = input("\n请选择操作 [1/2/3]: ").strip()
         
         if choice == "1":
             login_and_save_cookies()
@@ -436,9 +332,6 @@ if __name__ == "__main__":
             test_cookies()
         else:
             print("已退出") 
-    except KeyboardInterrupt:
-        print("\n\n程序被用户中断，正在退出...")
     except Exception as e:
         print(f"\n程序遇到错误: {e}")
-        print("如果您在Windows上看到中文乱码，请以管理员身份运行cmd并执行 'chcp 65001' 后重试")
-        print("如果您在macOS上遇到问题，请尝试直接在终端中运行 'python3 steam_cookies_helper.py'") 
+        print("如果您在Windows上看到中文乱码，请以管理员身份运行cmd并执行 'chcp 65001' 后重试") 

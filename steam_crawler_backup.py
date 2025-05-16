@@ -92,7 +92,7 @@ class SteamCrawler:
         
         # 仅在没有提供driver时初始化WebDriver
         if self.driver is None:
-        self.setup_driver()
+            self.setup_driver()
         else:
             logger.info("使用已创建的WebDriver实例")
         
@@ -458,13 +458,13 @@ class SteamCrawler:
             
             # 如果需要重新加载页面
             if needs_reload:
-            # 访问评论页面
-            logger.info(f"访问评论页面: {reviews_url}")
-            try:
-                self.driver.get(reviews_url)
-                time.sleep(IMPLICIT_WAIT)
-            except TimeoutException:
-                logger.warning(f"加载评论页面超时: {reviews_url}")
+                # 访问评论页面
+                logger.info(f"访问评论页面: {reviews_url}")
+                try:
+                    self.driver.get(reviews_url)
+                    time.sleep(IMPLICIT_WAIT)
+                except TimeoutException:
+                    logger.warning(f"加载评论页面超时: {reviews_url}")
                     
                 # 处理可能的年龄验证
                 if handle_age_check(self.driver):
@@ -529,13 +529,13 @@ class SteamCrawler:
             same_count_times = 0  # 连续相同评论数的次数，用于判断是否已加载完所有评论
             
             # 等待初始评论加载
-                try:
-                    WebDriverWait(self.driver, PAGE_LOAD_TIMEOUT).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, ".apphub_Card"))
-                    )
-                except TimeoutException:
-                    logger.warning("等待评论加载超时")
-                
+            try:
+                WebDriverWait(self.driver, PAGE_LOAD_TIMEOUT).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".apphub_Card"))
+                )
+            except TimeoutException:
+                logger.warning("等待评论加载超时")
+            
             while True:
                 # 获取当前页面所有评论
                 review_cards = self.driver.find_elements(By.CSS_SELECTOR, ".apphub_Card")
@@ -1360,18 +1360,18 @@ class JsonDataWriter:
             return None
         
         try:
-        # 根据游戏ID和评论ID创建文件名
-        app_id = review_data.get('app_id', 'unknown')
-        review_id = review_data.get('review_id', f"review_{int(time.time())}")
-        
-        # 创建游戏目录
-        game_dir = os.path.join(self.output_dir, f"app_{app_id}")
-        os.makedirs(game_dir, exist_ok=True)
-        
-        # 写入JSON文件
-        file_path = os.path.join(game_dir, f"{review_id}.json")
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(review_data, f, ensure_ascii=False, indent=2)
+            # 根据游戏ID和评论ID创建文件名
+            app_id = review_data.get('app_id', 'unknown')
+            review_id = review_data.get('review_id', f"review_{int(time.time())}")
+            
+            # 创建游戏目录
+            game_dir = os.path.join(self.output_dir, f"app_{app_id}")
+            os.makedirs(game_dir, exist_ok=True)
+            
+            # 写入JSON文件
+            file_path = os.path.join(game_dir, f"{review_id}.json")
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(review_data, f, ensure_ascii=False, indent=2)
             
             # 记录保存的文件
             self.saved_files.append(file_path)

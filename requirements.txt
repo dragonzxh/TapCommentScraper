@@ -1,26 +1,3 @@
-# 基础依赖
-beautifulsoup4>=4.9.3
 selenium>=4.0.0
-# pandas已移除，使用内置csv模块替代
-openpyxl>=3.0.7
-webdriver_manager>=3.8.0
-requests>=2.26.0
-python-dateutil>=2.8.2
-
-# Web界面依赖
-flask>=2.0.0
-werkzeug>=2.0.0
-jinja2>=3.0.0
-itsdangerous>=2.0.0
-click>=8.0.0
-
-# 工具与开发依赖
-tqdm>=4.62.0
-colorama>=0.4.4
-# Pillow可能需要系统级依赖
-# 如果安装失败：
-# - Mac: brew install libjpeg libtiff little-cms2 webp openjpeg
-# - Ubuntu: sudo apt-get install libjpeg-dev zlib1g-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev
-# - Windows: 通常可以直接安装，或尝试使用预编译的二进制包：pip install pillow --only-binary :all:
-pillow>=8.3.1
-python-dotenv>=0.19.0 
+webdriver-manager>=3.5.0
+requests>=2.25.0 

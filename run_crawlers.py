@@ -2,145 +2,152 @@
 # -*- coding: utf-8 -*-
 
 """
-爬虫运行脚本
-本脚本用于运行Steam、TapTap和Bilibili爬虫
+统一爬虫运行入口 - 用于启动不同的爬虫
 """
 
 import os
 import sys
-import time
-import json
 import argparse
-from pathlib import Path
+import logging
 
-def ensure_dir_exists(directory):
-    """确保目录存在"""
-    Path(directory).mkdir(parents=True, exist_ok=True)
-    print(f"目录已准备: {directory}")
+# 设置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("crawler.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("CrawlerLauncher")
 
-def run_steam_crawler():
-    """运行Steam爬虫"""
-    print("\n==================== 开始运行Steam爬虫 ====================")
-    try:
-        # 检查game_list.txt是否存在，如果不存在则创建一个示例文件
-        if not os.path.exists("game_list.txt"):
-            with open("game_list.txt", "w", encoding="utf-8") as f:
-                f.write("https://steamcommunity.com/app/1295660/reviews/?browsefilter=toprated&snr=1_5_100010_&filterLanguage=schinese\n")
-            print("已创建game_list.txt文件，包含示例游戏链接")
-        
-        # 引入steam_crawler模块
-        from steam_crawler import SteamCrawler
-        
-        # 创建爬虫实例并运行
-        crawler = SteamCrawler(use_headless=False)
-        
-        # 检查是否已登录
-        if not crawler.is_logged_in:
-            print("Steam Cookie验证失败，需要重新登录")
-            username = input("请输入Steam用户名: ")
-            password = input("请输入Steam密码: ")
-            
-            if not crawler.login(username, password):
-                print("登录失败，无法继续爬取")
-                return False
-        
-        # 从game_list.txt读取游戏URL列表
-        print("从game_list.txt读取游戏URL...")
-        with open("game_list.txt", "r", encoding="utf-8") as f:
-            game_urls = [line.strip() for line in f if line.strip()]
-        
-        if not game_urls:
-            print("game_list.txt中没有找到游戏URL")
-            return False
-        
-        print(f"找到 {len(game_urls)} 个游戏URL")
-        
-        # 爬取每个游戏的评论
-        for i, url in enumerate(game_urls, 1):
-            print(f"\n正在爬取第 {i}/{len(game_urls)} 个游戏: {url}")
-            try:
-                crawler.extract_comments(url)
-            except Exception as e:
-                print(f"爬取 {url} 失败: {e}")
-        
-        crawler.close()
-        print("\nSteam爬虫运行完成")
-        return True
+def run_steam_crawler(args, existing_driver=None):
+    """运行Steam爬虫
     
-    except Exception as e:
-        print(f"Steam爬虫运行出错: {e}")
-        return False
-
-def run_taptap_crawler():
-    """运行TapTap爬虫"""
-    print("\n==================== 开始运行TapTap爬虫 ====================")
+    Args:
+        args: 命令行参数
+        existing_driver: 已创建的WebDriver实例，如果提供则直接使用
+    """
     try:
-        # 引入tap_crawler模块
-        from tap_crawler import TapTapCrawler
+        from steam_crawler import SteamCrawler, JsonDataWriter
         
-        # 创建并运行爬虫
-        crawler = TapTapCrawler(use_headless=False)
-        crawler.run()
-        print("\nTapTap爬虫运行完成")
-        return True
-    
-    except Exception as e:
-        print(f"TapTap爬虫运行出错: {e}")
-        return False
-
-def run_bilibili_crawler():
-    """运行Bilibili爬虫"""
-    print("\n==================== 开始运行Bilibili爬虫 ====================")
-    try:
-        # 引入bili_crawler模块
-        from bili_crawler import BiliBiliCrawler
+        logger.info("启动Steam爬虫...")
         
-        # 创建并运行爬虫
-        crawler = BiliBiliCrawler(use_headless=False)
-        crawler.run()
-        print("\nBilibili爬虫运行完成")
+        # 初始化数据写入器
+        data_writer = JsonDataWriter()
+        
+        # 初始化爬虫
+        crawler = SteamCrawler(
+            use_headless=args.headless, 
+            data_writer=data_writer,
+            existing_driver=existing_driver
+        )
+        
+        # 运行爬虫
+        crawler.run(args.url)
+        
+        logger.info("Steam爬虫任务完成")
         return True
-    
     except Exception as e:
-        print(f"Bilibili爬虫运行出错: {e}")
+        logger.error(f"运行Steam爬虫出错: {e}")
         return False
 
 def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(description="游戏评论爬虫运行脚本")
-    parser.add_argument("--steam", action="store_true", help="运行Steam爬虫")
-    parser.add_argument("--taptap", action="store_true", help="运行TapTap爬虫")
-    parser.add_argument("--bilibili", action="store_true", help="运行Bilibili爬虫")
-    parser.add_argument("--all", action="store_true", help="运行所有爬虫")
+    """主入口函数"""
+    parser = argparse.ArgumentParser(description='统一爬虫运行入口')
+    subparsers = parser.add_subparsers(dest='crawler', help='选择要运行的爬虫')
     
+    # Steam爬虫参数
+    steam_parser = subparsers.add_parser('steam', help='Steam评论爬虫')
+    steam_parser.add_argument('--url', type=str, help='要爬取的游戏URL')
+    steam_parser.add_argument('--headless', action='store_true', help='使用无头模式')
+    steam_parser.add_argument('--max-reviews', type=int, default=None, help='最大爬取评论数')
+    
+    # 解析命令行参数
     args = parser.parse_args()
     
-    # 如果没有指定参数，显示帮助信息
-    if not (args.steam or args.taptap or args.bilibili or args.all):
+    # 如果没有指定爬虫类型，显示帮助
+    if not args.crawler:
         parser.print_help()
         return
     
-    # 创建输出目录
-    ensure_dir_exists("output")
-    
-    # 根据参数运行相应的爬虫
-    if args.all or args.steam:
-        run_steam_crawler()
-    
-    if args.all or args.taptap:
-        run_taptap_crawler()
-    
-    if args.all or args.bilibili:
-        run_bilibili_crawler()
-    
-    print("\n所有爬虫任务已完成！")
+    # 根据爬虫类型运行相应的爬虫
+    if args.crawler == 'steam':
+        # 先进行年龄验证处理
+        driver = None
+        if args.url:
+            try:
+                from age_verification import handle_age_verification_for_game
+                logger.info("正在启动爬虫...")
+                logger.info("正在准备steam爬虫...")
+                logger.info("服务器状态：初始化爬虫环境")
+                
+                logger.info("正在导入Steam爬虫模块...")
+                logger.info("服务器状态：加载Steam爬虫依赖")
+                
+                # 从URL提取游戏ID
+                import re
+                game_id = None
+                app_id_match = re.search(r'/app/(\d+)', args.url)
+                if app_id_match:
+                    game_id = app_id_match.group(1)
+                else:
+                    # 尝试直接作为ID处理
+                    if args.url.isdigit():
+                        game_id = args.url
+                
+                if game_id:
+                    logger.info(f"提取的游戏ID: {game_id}")
+                
+                    # 1. 处理年龄验证
+                    logger.info("1. 检查登录状态和处理年龄验证...")
+                    logger.info("服务器状态：准备验证流程")
+                    
+                    logger.info("2. 设置浏览器实例...")
+                    logger.info("3. 加载已保存的cookies...")
+                    logger.info("3.1 验证cookies是否正确加载...")
+                    logger.info(f"4. 处理游戏 {game_id} 的年龄验证...")
+                    
+                    # 进行年龄验证
+                    verification_success, driver = handle_age_verification_for_game(
+                        game_id, 
+                        use_headless=args.headless
+                    )
+                    
+                    if verification_success:
+                        logger.info("✅ 年龄验证处理成功")
+                        logger.info("5. 保存最新cookies...")
+                        logger.info("6. 继续使用当前浏览器实例进行爬取...")
+                        
+                        # 运行爬虫，传递已创建的driver
+                        logger.info("正在初始化爬虫...")
+                        logger.info("服务器状态：准备爬虫实例")
+                        logger.info("使用已创建的浏览器实例...")
+                        
+                        run_steam_crawler(args, existing_driver=driver)
+                    else:
+                        logger.error("年龄验证处理失败，无法继续爬取")
+                        logger.info("服务器状态：爬虫启动失败，请检查年龄验证")
+                else:
+                    logger.error(f"无法从URL中提取游戏ID: {args.url}")
+                    logger.info("服务器状态：爬虫启动失败，无效的游戏URL")
+            except Exception as e:
+                logger.error(f"爬虫运行出错: {e}")
+                logger.info("服务器状态：爬虫启动失败，请检查系统环境")
+            finally:
+                # 确保关闭driver
+                if driver:
+                    try:
+                        driver.quit()
+                        logger.info("浏览器实例已关闭")
+                    except:
+                        pass
+                logger.info("爬虫任务结束")
+        else:
+            # 没有提供URL，直接运行爬虫
+            run_steam_crawler(args)
+    else:
+        logger.error(f"未知的爬虫类型: {args.crawler}")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n程序被用户中断")
-    except Exception as e:
-        print(f"\n程序运行时出错: {e}")
-    finally:
-        print("\n程序退出") 
+    main() 
