@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam评论爬虫工具</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .panel {
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .id-input {
+            width: 60%;
+            display: inline-block;
+        }
+        .url-input {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+        .input-group .prefix {
+            background-color: #f1f1f1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-right: none;
+            border-radius: 4px 0 0 4px;
+            color: #666;
+        }
+        .input-group input {
+            border-radius: 0 4px 4px 0;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.secondary {
+            background-color: #2196F3;
+        }
+        button.secondary:hover {
+            background-color: #0b7dda;
+        }
+        .progress-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f1f1f1;
+        }
+        .progress-bar {
+            height: 30px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+            text-align: center;
+            line-height: 30px;
+            color: white;
+        }
+        .log-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            background-color: #2b2b2b;
+            color: #f8f8f8;
+            font-family: 'Courier New', monospace;
+        }
+        .log-line {
+            margin: 2px 0;
+        }
+        .view-comments-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #0066cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 16px;
+        }
+        .view-comments-btn:hover {
+            background-color: #0052a3;
+        }
+        .info-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .feature-section {
+            background-color: #e8f4ff;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+        .feature-section h3 {
+            margin-top: 0;
+            color: #0b7dda;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        .header-links {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header-links a {
+            margin: 0 10px;
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .header-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Steam评论爬虫工具</h1>
+        
+        <div class="header-links">
+            <a href="{{ url_for('index') }}">主页</a>
+            <a href="{{ url_for('list_comments') }}">查看已爬取评论</a>
+        </div>
+        
+        <div class="feature-section">
+            <h3>Steam评论爬虫说明</h3>
+            <p>本工具可以爬取Steam游戏评论，无需登录，并自动处理年龄验证和内容警告。</p>
+            <p>使用新版爬虫支持：</p>
+            <ul>
+                <li>无需登录即可爬取评论</li>
+                <li>自动处理年龄验证和内容警告</li>
+                <li>滚动加载以获取更多评论</li>
+                <li>保存为JSON格式便于分析</li>
+            </ul>
+        </div>
+        
+        <div class="panel">
+            <div class="form-group">
+                <label for="steam-id">Steam游戏ID：</label>
+                <div class="input-group">
+                    <span class="prefix">AppID:</span>
+                    <input type="text" id="steam-id" class="id-input" placeholder="例如：1295660" oninput="updateSteamUrl()">
+                </div>
+                <p class="info-text">只需要输入Steam游戏的AppID，系统将自动生成完整URL。爬取过程会自动处理年龄验证和内容警告。</p>
+                <div class="url-input" id="steam-url-display">完整URL: https://steamcommunity.com/app/<span id="steam-id-display">1295660</span>/reviews/</div>
+                <input type="hidden" id="steam-url">
+            </div>
+            <div class="form-group">
+                <label for="steam-headless">是否使用无头模式：</label>
+                <select id="steam-headless">
+                    <option value="true">是</option>
+                    <option value="false">否</option>
+                </select>
+                <p class="info-text">无头模式下浏览器不会显示界面，适合自动化运行；非无头模式可以看到爬取过程，适合调试。</p>
+            </div>
+            <div class="form-group">
+                <label for="max-reviews">读取评论数量：</label>
+                <input type="text" id="max-reviews" placeholder="默认全部" value="">
+                <p class="info-text">限制读取的评论数量，留空表示读取全部评论。对于评论数量很多的游戏，建议限制数量以提高速度。</p>
+            </div>
+            <button onclick="startCrawler('steam')">开始爬取</button>
+        </div>
+        
+        <div class="panel">
+            <h3>爬取进度</h3>
+            <div id="total-reviews-info" style="margin-bottom: 10px; color: #0066cc; font-weight: bold; display: none;">
+                检测到评论总数：<span id="total-reviews-count">0</span> 条
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar">0%</div>
+            </div>
+            
+            <h3>日志输出</h3>
+            <div class="log-container" id="log-container">
+                <div class="log-line">等待爬虫启动...</div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="{{ url_for('list_comments') }}" class="view-comments-btn">查看已爬取的评论</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 更新Steam URL
+        function updateSteamUrl() {
+            const steamId = document.getElementById('steam-id').value || '1295660';
+            document.getElementById('steam-id-display').textContent = steamId;
+            document.getElementById('steam-url').value = `https://steamcommunity.com/app/${steamId}/reviews/`;
+        }
+        
+        // 页面加载时初始化URL
+        window.onload = function() {
+            updateSteamUrl();
+        };
+        
+        // 启动爬虫
+        function startCrawler(type) {
+            const progressBar = document.getElementById('progress-bar');
+            const logContainer = document.getElementById('log-container');
+            
+            // 获取URL和其他设置
+            let url = document.getElementById('steam-url').value;
+            let useHeadless = document.getElementById('steam-headless').value === 'true';
+            let maxReviews = document.getElementById('max-reviews').value.trim();
+            
+            console.log("原始maxReviews值:", maxReviews, "类型:", typeof maxReviews);
+            
+            // 如果maxReviews不为空且为数字，则转换为数字
+            // 处理"全部"或空字符串的情况
+            if (maxReviews === '' || maxReviews === '全部') {
+                maxReviews = null;
+                console.log("设置为全部评论");
+            } else {
+                // 尝试转换为整数
+                let parsedValue = parseInt(maxReviews);
+                if (!isNaN(parsedValue) && parsedValue > 0) {
+                    maxReviews = parsedValue;
+                } else {
+                    // 如果转换失败或小于等于0，设为null
+                    maxReviews = null;
+                    console.log("无效的数值，设置为全部评论");
+                }
+            }
+            
+            console.log("转换后maxReviews值:", maxReviews, "类型:", typeof maxReviews);
+            
+            // 检查ID是否填写
+            if (!url || url.includes('undefined')) {
+                logContainer.innerHTML = '<div class="log-line">错误：请输入有效的游戏ID</div>';
+                return;
+            }
+            
+            // 重置进度和日志
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            logContainer.innerHTML = '<div class="log-line">正在启动爬虫...</div>';
+            
+            // 隐藏总评论数信息
+            document.getElementById('total-reviews-info').style.display = 'none';
+            
+            // 发送请求启动爬虫
+            let requestBody = { 
+                type: type, 
+                url: url,
+                headless: useHeadless,
+                max_reviews: maxReviews
+            };
+            
+            console.log("发送请求体:", JSON.stringify(requestBody));
+            
+            fetch('/api/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 开始轮询状态
+                    pollStatus();
+                } else {
+                    logContainer.innerHTML += `<div class="log-line">错误：${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                logContainer.innerHTML += `<div class="log-line">错误：${error.message}</div>`;
+            });
+        }
+        
+        // 轮询爬虫状态
+        function pollStatus() {
+            const progressBar = document.getElementById('progress-bar');
+            const logContainer = document.getElementById('log-container');
+            const totalReviewsInfo = document.getElementById('total-reviews-info');
+            const totalReviewsCount = document.getElementById('total-reviews-count');
+            
+            fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                // 更新进度条
+                progressBar.style.width = `${data.progress}%`;
+                progressBar.textContent = `${data.progress}%`;
+                
+                // 更新日志
+                logContainer.innerHTML = '';
+                data.log.forEach(line => {
+                    logContainer.innerHTML += `<div class="log-line">${line}</div>`;
+                    
+                    // 检查是否包含总评论数信息
+                    const totalReviewsMatch = line.match(/检测到评论总数：(\d+)/);
+                    if (totalReviewsMatch) {
+                        totalReviewsCount.textContent = totalReviewsMatch[1];
+                        totalReviewsInfo.style.display = 'block';
+                    }
+                });
+                
+                // 自动滚动到底部
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+                // 如果爬虫仍在运行，继续轮询
+                if (data.running) {
+                    setTimeout(pollStatus, 1000);
+                }
+            })
+            .catch(error => {
+                logContainer.innerHTML += `<div class="log-line">错误：${error.message}</div>`;
+            });
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏评论爬虫工具</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .panel {
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #eee;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #fff;
+            font-weight: bold;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .id-input {
+            width: 60%;
+            display: inline-block;
+        }
+        .url-input {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+        .input-group .prefix {
+            background-color: #f1f1f1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-right: none;
+            border-radius: 4px 0 0 4px;
+            color: #666;
+        }
+        .input-group input {
+            border-radius: 0 4px 4px 0;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.secondary {
+            background-color: #2196F3;
+        }
+        button.secondary:hover {
+            background-color: #0b7dda;
+        }
+        .progress-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f1f1f1;
+        }
+        .progress-bar {
+            height: 30px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+            text-align: center;
+            line-height: 30px;
+            color: white;
+        }
+        .log-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            background-color: #2b2b2b;
+            color: #f8f8f8;
+            font-family: 'Courier New', monospace;
+        }
+        .log-line {
+            margin: 2px 0;
+        }
+        .view-comments-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #0066cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 16px;
+        }
+        .view-comments-btn:hover {
+            background-color: #0052a3;
+        }
+        .info-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .feature-section {
+            background-color: #e8f4ff;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+        .feature-section h3 {
+            margin-top: 0;
+            color: #0b7dda;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        .header-links {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header-links a {
+            margin-right: 10px;
+            text-decoration: none;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>游戏评论爬虫工具</h1>
+        
+        <div class="header-links">
+            <a href="{{ url_for('list_comments') }}">查看已爬取评论</a>
+            <a href="{{ url_for('steam_only') }}">Steam独立页面</a>
+        </div>
+        
+        <div class="panel">
+            <div class="tab-container">
+                <div class="tab active" data-target="steam">Steam爬虫</div>
+                <div class="tab" data-target="taptap">TapTap爬虫</div>
+                <div class="tab" data-target="bilibili">Bilibili爬虫</div>
+            </div>
+            
+            <div id="steam-form" class="crawler-form">
+                <div class="form-group">
+                    <label for="steam-id">Steam游戏ID：</label>
+                    <div class="input-group">
+                        <span class="prefix">AppID:</span>
+                        <input type="text" id="steam-id" class="id-input" placeholder="例如：1295660" oninput="updateSteamUrl()">
+                    </div>
+                    <p class="info-text">只需要输入Steam游戏的AppID，系统将自动生成完整URL。爬取过程会自动处理年龄验证。</p>
+                    <div class="url-input" id="steam-url-display">完整URL: https://steamcommunity.com/app/<span id="steam-id-display">1295660</span>/reviews/</div>
+                    <input type="hidden" id="steam-url">
+                </div>
+                <div class="form-group">
+                    <label for="steam-headless">是否使用无头模式：</label>
+                    <select id="steam-headless">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                    </select>
+                </div>
+                <button onclick="startCrawler('steam')">开始爬取</button>
+            </div>
+            
+            <div id="taptap-form" class="crawler-form" style="display: none;">
+                <div class="form-group">
+                    <label for="taptap-id">TapTap游戏ID：</label>
+                    <div class="input-group">
+                        <span class="prefix">GameID:</span>
+                        <input type="text" id="taptap-id" class="id-input" placeholder="例如：12345" oninput="updateTaptapUrl()">
+                    </div>
+                    <p class="info-text">只需要输入TapTap游戏的ID，系统将自动生成完整URL。</p>
+                    <div class="url-input" id="taptap-url-display">完整URL: https://www.taptap.com/app/<span id="taptap-id-display">12345</span></div>
+                    <input type="hidden" id="taptap-url">
+                </div>
+                <div class="form-group">
+                    <label for="taptap-headless">是否使用无头模式：</label>
+                    <select id="taptap-headless">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                    </select>
+                </div>
+                <button onclick="startCrawler('taptap')">开始爬取</button>
+            </div>
+            
+            <div id="bilibili-form" class="crawler-form" style="display: none;">
+                <div class="form-group">
+                    <label for="bilibili-id">Bilibili视频ID：</label>
+                    <div class="input-group">
+                        <span class="prefix">BV号:</span>
+                        <input type="text" id="bilibili-id" class="id-input" placeholder="例如：BV1xx411c7mD" oninput="updateBilibiliUrl()">
+                    </div>
+                    <p class="info-text">只需要输入Bilibili视频的BV号，系统将自动生成完整URL。</p>
+                    <div class="url-input" id="bilibili-url-display">完整URL: https://www.bilibili.com/video/<span id="bilibili-id-display">BV1xx411c7mD</span></div>
+                    <input type="hidden" id="bilibili-url">
+                </div>
+                <div class="form-group">
+                    <label for="bilibili-headless">是否使用无头模式：</label>
+                    <select id="bilibili-headless">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                    </select>
+                </div>
+                <button onclick="startCrawler('bilibili')">开始爬取</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h3>爬取进度</h3>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar">0%</div>
+            </div>
+            
+            <h3>日志输出</h3>
+            <div class="log-container" id="log-container">
+                <div class="log-line">等待爬虫启动...</div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="{{ url_for('list_comments') }}" class="view-comments-btn">查看已爬取的评论</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 切换标签页
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // 激活当前标签
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // 显示对应表单
+                const target = this.getAttribute('data-target');
+                document.querySelectorAll('.crawler-form').forEach(form => {
+                    form.style.display = 'none';
+                });
+                document.getElementById(`${target}-form`).style.display = 'block';
+            });
+        });
+        
+        // 更新Steam URL
+        function updateSteamUrl() {
+            const steamId = document.getElementById('steam-id').value || '1295660';
+            document.getElementById('steam-id-display').textContent = steamId;
+            document.getElementById('steam-url').value = `https://steamcommunity.com/app/${steamId}/reviews/`;
+        }
+        
+        // 更新TapTap URL
+        function updateTaptapUrl() {
+            const taptapId = document.getElementById('taptap-id').value || '12345';
+            document.getElementById('taptap-id-display').textContent = taptapId;
+            document.getElementById('taptap-url').value = `https://www.taptap.com/app/${taptapId}`;
+        }
+        
+        // 更新Bilibili URL
+        function updateBilibiliUrl() {
+            const bilibiliId = document.getElementById('bilibili-id').value || 'BV1xx411c7mD';
+            document.getElementById('bilibili-id-display').textContent = bilibiliId;
+            document.getElementById('bilibili-url').value = `https://www.bilibili.com/video/${bilibiliId}`;
+        }
+        
+        // 页面加载时初始化URL
+        window.onload = function() {
+            updateSteamUrl();
+            updateTaptapUrl();
+            updateBilibiliUrl();
+        };
+        
+        // 启动爬虫
+        function startCrawler(type) {
+            const progressBar = document.getElementById('progress-bar');
+            const logContainer = document.getElementById('log-container');
+            
+            // 获取URL
+            let url = '';
+            let useHeadless = true;
+            if (type === 'steam') {
+                url = document.getElementById('steam-url').value;
+                useHeadless = document.getElementById('steam-headless').value === 'true';
+            } else if (type === 'taptap') {
+                url = document.getElementById('taptap-url').value;
+                useHeadless = document.getElementById('taptap-headless').value === 'true';
+            } else if (type === 'bilibili') {
+                url = document.getElementById('bilibili-url').value;
+                useHeadless = document.getElementById('bilibili-headless').value === 'true';
+            }
+            
+            // 检查ID是否填写
+            if (!url || url.includes('undefined')) {
+                logContainer.innerHTML = '<div class="log-line">错误：请输入有效的游戏/视频ID</div>';
+                return;
+            }
+            
+            // 重置进度和日志
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            logContainer.innerHTML = '<div class="log-line">正在启动爬虫...</div>';
+            
+            // 发送请求启动爬虫
+            fetch('/api/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    type: type, 
+                    url: url,
+                    headless: useHeadless
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 开始轮询状态
+                    pollStatus();
+                } else {
+                    logContainer.innerHTML += `<div class="log-line">错误：${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                logContainer.innerHTML += `<div class="log-line">错误：${error.message}</div>`;
+            });
+        }
+        
+        // 轮询爬虫状态
+        function pollStatus() {
+            const progressBar = document.getElementById('progress-bar');
+            const logContainer = document.getElementById('log-container');
+            
+            fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                // 更新进度条
+                progressBar.style.width = `${data.progress}%`;
+                progressBar.textContent = `${data.progress}%`;
+                
+                // 更新日志
+                logContainer.innerHTML = '';
+                data.log.forEach(line => {
+                    logContainer.innerHTML += `<div class="log-line">${line}</div>`;
+                });
+                
+                // 自动滚动到底部
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+                // 如果爬虫仍在运行，继续轮询
+                if (data.running) {
+                    setTimeout(pollStatus, 1000);
+                }
+            })
+            .catch(error => {
+                logContainer.innerHTML += `<div class="log-line">错误：${error.message}</div>`;
+            });
+        }
+    </script>
+</body>
+</html> 

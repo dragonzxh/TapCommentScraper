@@ -1,0 +1,30 @@
+# Python虚拟环境
+venv/
+
+# 输出数据和日志
+output/
+logs/
+cookies/
+
+# macOS系统文件
+.DS_Store
+
+# Python缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 运行时标记文件
+.browser_opened
+
+# 其他临时/备份文件
+*.bak
+*.swp
+*.tmp
+
+# Jupyter等notebook
+*.ipynb_checkpoints/
+
+# 不提交本地配置
+.env 
